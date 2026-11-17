@@ -61,11 +61,17 @@ export class StackPane {
           .child(h_flex().flex_1().min_w(0).gap(4).items_center().when(Boolean(ci), (e) => e.child(div().text_color(ci[1]).child(ci[0])).child(div().text_color(t.dim).child("CI"))))
           .when(drafts > 0, (e) => e.child(div().flex_none().text_color(C.hunkText).child(`${drafts} unsent comment${drafts === 1 ? "" : "s"}`))));
     };
-    // A stack's line: repo, name, then what goes on the right. Section headings and Link rows share it.
-    const stackLine = (id, prs, ...right) => h_flex().id(id).flex_none().h(28).px(8).gap(8).items_center()
-      .child(div().flex_none().text_size(12).font_semibold().child(prs[0].repo))
-      .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(stackName(prs)))
-      .children(right.filter(Boolean));
+    // A stack's line: repo, name (a GitHub stack's name opens its page), then what goes on the right. Section headings
+    // and Link rows share it.
+    const stackLine = (id, prs, ...right) => {
+      const url = stackUrl(prs[0]);
+      return h_flex().id(id).flex_none().h(28).px(8).gap(8).items_center()
+        .child(div().flex_none().text_size(12).font_semibold().child(prs[0].repo))
+        .child(h_flex().flex_1().min_w(0).child(div().id(`${id}-name`).min_w(0).truncate().text_size(12).text_color(t.muted).child(stackName(prs))
+          .when(Boolean(url), (e) => e.cursor_pointer().hover((s) => s.text_color(t.foreground)).tooltip("Open the stack on GitHub")
+            .on_click((_e, cx) => { cx.stop_propagation(); exec("open", [url]).catch(() => null); }))))
+        .children(right.filter(Boolean));
+    };
     const stackRow = (s) => stackLine(`link-${s[0].url}`, s, chip(`do-link-${s[0].url}`, "Link", (cx) => this.act(cx, () => link(terminal, `stack.${s[0].stack ?? s[0].number}`, stackUrl(s[0]) ?? s.at(-1).url))));
     // A stack's heading (with its GitHub stack's number) and its PRs. Unlink when a label made it (not for the agent's
     // own branch's stack).
