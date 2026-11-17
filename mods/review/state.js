@@ -39,7 +39,7 @@ export function prFor({ branch, cwd }) {
   return [...(all?.open ?? []), ...(all?.merged ?? [])].find((p) => p.branch === branch && parts.includes(p.repo)) ?? null;
 }
 
-// ---- Stacks: open PRs chained by base -> branch, one per agent (an orchestrator's, or the one its own branch is in).
+// ---- Stacks: open PRs chained by base -> branch. An agent has the ones its labels name, and the one its branch is in.
 
 export const picksOf = () => shared("review.pick") ?? {};
 const openPRs = () => shared("work.prs")?.open ?? [];
@@ -62,18 +62,32 @@ export function allStacks(all = openPRs()) {
   if (chain(b, [c, a, b, d]).map((p) => p.url).join() !== "u1,u2,u3" || allStacks([c, a, b, d]).length !== 1) throw new Error("stack self-check failed");
 }
 
-// A terminal's stack: the one its "stack" label names (a PR URL; agents set it with hc label), else the one its own
-// branch's PR is in.
-export function stackFor(terminal) {
-  const url = terminal ? terminals().find((k) => k.address === terminal)?.labels?.stack : null;
-  const pane = panes().find((p) => p.terminal === terminal), own = terminal && !url ? prFor({ branch: pane?.branch, cwd: pane?.cwd }) : null;
-  const seed = url ? openPRs().find((p) => p.url === url) : own?.state === "OPEN" ? own : null;
-  const prs = seed ? chain(seed) : [];
-  return { prs: url || prs.length > 1 ? prs : [], url: url ?? null };
+// A terminal's stacks: one per "stack" or "stack.<name>" label (a PR URL; agents set them with hc label), plus the
+// one its own branch's PR is in. A label whose PR is no longer open stays as an empty stack, to unlink it.
+export function stacksFrom(labels, own, all) {
+  const out = [], shown = (url) => out.some((s) => s.prs.some((p) => p.url === url));
+  for (const [key, url] of Object.entries(labels ?? {})) {
+    if (!/^stack(\..+)?$/.test(key) || !url || shown(url)) continue;
+    const seed = all.find((p) => p.url === url);
+    out.push({ key, prs: seed ? chain(seed, all) : [] });
+  }
+  if (own && !shown(own.url)) { const prs = chain(own, all); if (prs.length > 1) out.push({ key: null, prs }); }
+  return out;
 }
-// Links a terminal to the stack of the PR at `url` (none: unlinks), as an agent would with hc label.
-export async function link(terminal, url) {
-  const r = await hc(["label", terminal, `stack=${url ?? ""}`]);
+{
+  const pr = (n, base) => ({ owner: "o/r", url: `u${n}`, branch: `b${n}`, base });
+  const all = [pr(1, "main"), pr(2, "b1"), pr(3, "b2"), pr(4, "main"), pr(5, "b4")];
+  const got = stacksFrom({ "stack.x": "u3", "stack.y": "u5", "stack.z": "u2", stack: "gone", other: "u1" }, all[1], all);
+  if (got.map((s) => s.prs.map((p) => p.url).join("|") || "-").join(" ") !== "u1|u2|u3 u4|u5 -") throw new Error("stacks self-check failed");
+}
+export function stacksFor(terminal) {
+  if (!terminal) return [];
+  const pane = panes().find((p) => p.terminal === terminal), own = prFor({ branch: pane?.branch, cwd: pane?.cwd });
+  return stacksFrom(terminals().find((k) => k.address === terminal)?.labels, own?.state === "OPEN" ? own : null, openPRs());
+}
+// Sets a terminal's stack label `key` to the PR at `url` (none: unlinks), as an agent would with hc label.
+export async function link(terminal, key, url) {
+  const r = await hc(["label", terminal, `${key}=${url ?? ""}`]);
   if (r.code !== 0) throw new Error((r.stderr || r.stdout).trim());
 }
 

@@ -6,7 +6,7 @@
 import { div } from "gpui-kit";
 import { h_flex, v_flex, TextareaState, Textarea } from "gpui-base";
 import { panes, exec, hc, run, settings, shared, theme } from "herdr";
-import { mode, tied, target, key, prFor, viewedOf, setViewed, commentsOf, setComments, onScreen, stackFor, setPick, showPanel } from "./state.js";
+import { mode, tied, target, key, prFor, viewedOf, setViewed, commentsOf, setComments, onScreen, stacksFor, setPick, showPanel } from "./state.js";
 import { C, STATUS, anchor, message, loadDiffs, saveSent } from "./git.js";
 import { RepoView } from "./repo.js";
 
@@ -16,7 +16,7 @@ const KEYS = [
   ["j k  ↓ ↑", "next / previous line"], ["shift ↓ ↑", "extend the selection"], ["J K", "next / previous file"],
   ["space  shift-space", "page down / up"], ["g G", "top / bottom"], ["a  ⌘⇧C", "comment on the selection (double-click a line)"],
   ["v  ⌘E", "mark the file viewed"], ["o  ⌘⇧E", "only this file"], ["p  ⌘↵", "preview the comments, again to send"],
-  ["[ ]", "previous / next PR of the agent's stack"], ["esc", "close · clear the selection"], ["?", "these keys"],
+  ["[ ]", "previous / next PR of the agent's stacks"], ["esc", "close · clear the selection"], ["?", "these keys"],
 ];
 
 // A row's identity across rebuilds: its file, kind and line number (hunk and note rows by their text).
@@ -341,9 +341,10 @@ export class ReviewTab extends RepoView {
   // A stack PR's comments say which PR and worktree: file paths are the same in every worktree.
   where() { const t = target(), p = t.pick && prFor(t); return p ? `PR #${p.number} (${p.branch}, worktree ${this.root})` : null; }
 
-  // [ / ]: the previous / next PR of the terminal's stack that has a local worktree; before the first, its own worktree.
+  // [ / ]: the previous / next PR, through all the terminal's stacks, that has a local worktree; before the first, its
+  // own worktree.
   stepPR(d, cx) {
-    const prs = stackFor(tied()).prs.filter((p) => p.dir);
+    const prs = stacksFor(tied()).flatMap((s) => s.prs).filter((p, i, a) => p.dir && a.findIndex((q) => q.url === p.url) === i);
     if (!prs.length) { this.say("note", "No stack with local worktrees: see the Stack pane (⌘⇧K)"); cx.notify(); return; }
     const i = prs.findIndex((p) => p.url === target().pick?.url), j = Math.max(-1, Math.min(prs.length - 1, i + d));
     if (j !== i) setPick(tied(), prs[j] ?? null);
@@ -464,7 +465,9 @@ export class ReviewTab extends RepoView {
       if (this.only) this.only = want.path; else this.fold[want.path] = false;
     }
     const can = this.canComment(), list = this.comments(), pr = prFor(target()), viewedMap = viewedOf(this.commentsKey);
-    const stack = stackFor(tied()).prs, at = stack.findIndex((p) => p.url === target().pick?.url);
+    const stacks = stacksFor(tied()), picked = target().pick?.url, all = stacks.flatMap((s) => s.prs);
+    const inStack = stacks.find((s) => s.prs.some((p) => p.url === picked));
+    const stackLabel = inStack ? `‹ ${inStack.prs.findIndex((p) => p.url === picked) + 1}/${inStack.prs.length} ›` : stacks.length > 1 ? `${stacks.length} stacks` : `stack · ${all.length} PRs`;
     this.layout(list, viewedMap);
     this.applyMoves();
     // From the loaded diff's file entries (new files' line counts are set there).
@@ -492,7 +495,7 @@ export class ReviewTab extends RepoView {
         .when(add > 0, (e) => e.child(div().text_size(11).text_color(C.green).child(`+${add}`)))
         .when(del > 0, (e) => e.child(div().text_size(11).text_color(C.red).child(`−${del}`)))
         .child(div().text_size(10.5).text_color(t.dim).child(mode() === "branch" ? `vs ${this.baseName ?? "origin/main"}` : mode() === "sent" ? "since your last send" : "uncommitted"))
-        .when(stack.length > 0, (e) => e.child(chip("stack", at >= 0 ? `‹ ${at + 1}/${stack.length} ›` : `stack · ${stack.length} PRs`, t.foreground, () => showPanel("stack")).tooltip("[ ] previous / next PR · click: the Stack pane")))
+        .when(all.length > 0, (e) => e.child(chip("stack", stackLabel, t.foreground, () => showPanel("stack")).tooltip("[ ] previous / next PR · click: the Stack pane")))
         .when(Boolean(pr), (e) => e.child(chip("pr", pr.label ?? `#${pr.number}`, TONE[pr.tone] ?? t.muted, () => { exec("open", [pr.url]).catch(() => null); })))
         .child(div().flex_1())
         .child(chip("keys", "? keys", null, (_e, cx) => { this.help = !this.help; cx.notify(); }))

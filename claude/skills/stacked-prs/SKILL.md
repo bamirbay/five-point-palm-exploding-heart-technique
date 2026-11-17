@@ -31,12 +31,13 @@ description: Plan, build and maintain a stack of dependent PRs (each PR based on
 
 ## Link the stack (in Herdr)
 
-After each PR opens, label your own terminal with the newest PR at the top of the stack:
+After each PR opens, label your own terminal with the newest PR at the top of the stack. Name the label after the
+stack's first ticket:
 
-`hc label $HC_TERMINAL_ID stack=<url of the top PR>`
+`hc label $HC_TERMINAL_ID stack.<first ticket key>=<url of the top PR>`
 
-The user's Stack pane (⌘⇧K) then lists the whole stack for your session, and review comments from it come to you.
-Use the top PR: the bottom one merges first. To unlink: `hc label $HC_TERMINAL_ID stack=`.
+One label per stack, so you can run several. The user's Stack pane (⌘⇧K) lists them for your session, and review
+comments from it come to you. Use the top PR: the bottom one merges first. To unlink one: `hc label $HC_TERMINAL_ID stack.<key>=`.
 
 ## Review comments
 
