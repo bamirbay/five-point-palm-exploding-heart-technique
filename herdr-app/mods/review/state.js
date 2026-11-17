@@ -1,29 +1,30 @@
-// Review's shared state, and the terminal a review is about.
-// Shared keys: review.mode ("branch" | "uncommitted" | "sent"), review.open (terminal -> {path, at}: the file to jump to), review.tabs (terminal -> its
-// review tab's name), review.comments / review.viewed (repo key -> comments / path -> diff fingerprint), review.pick
-// (terminal -> {url, branch, dir}: the stack PR its review tab shows instead of its own worktree).
-// PR facts (the base branch, each PR's worktree) come from the work badge's work.prs.
+// Review's shared state, and what a review is about.
+// Shared keys: review.views (terminal -> {pr: {url, branch, dir} | null, mode: "branch" | "uncommitted" | "sent"}: what
+// that terminal's review shows, in its review tab and in the Changes sidebar alike), review.open (terminal -> {path,
+// at}: the file to jump to), review.tabs (terminal -> its review tab's name), review.comments / review.viewed (repo key
+// -> comments / path -> diff fingerprint).
+// PR facts (the base branch, each PR's worktree, GitHub stacks) come from the work badge's work.prs.
 import { spaces, panes, focused, terminals, props, run, notify, shared, setShared, layout, hc } from "herdr";
 
-export const mode = () => shared("review.mode") ?? "branch";
 export const tied = () => props()?.agent ?? null;
 export const tabsOf = () => shared("review.tabs") ?? {};
 const machineOf = (address) => (address?.includes("/") ? address.split("/")[0] : null);
 const branchOf = (terminal) => panes().find((p) => p.terminal === terminal)?.branch ?? null;
 
-// The terminal a review is about: the tab's own; in the sidebar, the focused pane's, or a focused review tab's terminal.
-// A review tab (and the sidebar beside it) shows the stack PR picked for its terminal, if any, from that PR's worktree.
+// What a review is about: its terminal (the tab's own; in the sidebar, the focused pane's or a focused review tab's)
+// and that terminal's view. A chosen stack PR is read from the PR's worktree (pick: the PR, mode: the view's mode).
 export function target() {
-  const t = terminalTarget(), pick = t.tab ? picksOf()[t.terminal] : null;
-  return pick ? { ...t, cwd: pick.dir, on: null, branch: pick.branch, pick } : t;
+  const t = terminalTarget(), v = viewOf(t.terminal);
+  return v.pr ? { ...t, cwd: v.pr.dir, on: null, branch: v.pr.branch, pick: v.pr, mode: v.mode } : { ...t, mode: v.mode };
 }
+export const mode = () => target().mode;
 function terminalTarget() {
-  if (tied()) return { tab: true, terminal: tied(), cwd: panes().find((p) => p.terminal === tied())?.cwd || props().cwd, on: props().on ?? null, branch: branchOf(tied()) };
+  if (tied()) return { terminal: tied(), cwd: panes().find((p) => p.terminal === tied())?.cwd || props().cwd, on: props().on ?? null, branch: branchOf(tied()) };
   const f = focused(), pane = f?.pane ? panes().find((p) => p.pane === f.pane) : null;
   if (pane?.mod === "review") {
     const name = spaces().flatMap((s) => s.tabs).find((t) => t.id === pane.tab)?.name;
     const hit = Object.entries(tabsOf()).find(([, v]) => v.name === name);
-    if (hit) return { tab: true, terminal: hit[0], cwd: panes().find((p) => p.terminal === hit[0])?.cwd || hit[1].cwd, on: hit[1].on ?? null, branch: branchOf(hit[0]) };
+    if (hit) return { terminal: hit[0], cwd: panes().find((p) => p.terminal === hit[0])?.cwd || hit[1].cwd, on: hit[1].on ?? null, branch: branchOf(hit[0]) };
   }
   const space = spaces().find((s) => s.active), terminal = pane?.terminal ?? f?.terminal ?? null;
   const on = f?.pane === null ? machineOf(f.terminal) : space?.machine ?? null;
@@ -42,7 +43,6 @@ export function prFor({ branch, cwd }) {
 // ---- Stacks: GitHub's stacks of open PRs (p.stack, p.position, from the work badge's poll); for PRs in none, the PRs
 // chained by base -> branch. An agent has the ones its labels name, and the one its own branch is in.
 
-export const picksOf = () => shared("review.pick") ?? {};
 const openPRs = () => shared("work.prs")?.open ?? [];
 const ghStacks = () => shared("work.prs")?.stacks ?? {};
 export const stackUrl = (p) => (p?.stack ? `https://github.com/${p.owner}/stack/${p.stack}` : null);
@@ -107,16 +107,26 @@ export async function link(terminal, key, url) {
 
 export function showPanel(id) { run("layout.select", { stack: "panel-body", child: id }); run("layout.show", { id: "panel" }); }
 
-// The PR a review tab shows instead of its terminal's worktree (null: back to the worktree).
-export function setPick(terminal, p) {
-  const all = { ...picksOf() };
-  if (p) all[terminal] = { url: p.url, branch: p.branch, dir: p.dir }; else delete all[terminal];
-  setShared("review.pick", all);
+// ---- Views: what a terminal's review shows. Only the Stack pane, [ ] in the review tab and the mode buttons change one
+// (choose, setView); opening or showing a review never does. A chosen PR that is no longer open, or has no local
+// worktree, falls back to the terminal's own worktree.
+export function viewOf(terminal) {
+  const v = (shared("review.views") ?? {})[terminal] ?? {};
+  const p = v.pr && openPRs().find((x) => x.url === v.pr.url && x.dir);
+  return { pr: p ? { url: p.url, branch: p.branch, dir: p.dir } : null, mode: v.mode ?? "branch" };
 }
+export function setView(terminal, patch) {
+  if (!terminal) return;
+  const all = { ...(shared("review.views") ?? {}) };
+  all[terminal] = { ...(all[terminal] ?? {}), ...patch };
+  setShared("review.views", all);
+}
+// A stack PR (shown in Branch mode: that PR's own diff), or null for the terminal's own worktree.
+export const choose = (terminal, p) => setView(terminal, p ? { pr: { url: p.url, branch: p.branch, dir: p.dir }, mode: "branch" } : { pr: null });
 
 // What a review shows depends on these; any change starts it over. The PR's base is in it, so a stacked PR's
 // review compares with its base branch from the first load.
-export const key = () => { const t = target(); return JSON.stringify([t.cwd, t.on, mode(), prFor(t)?.base ?? null]); };
+export const key = () => { const t = target(); return JSON.stringify([t.cwd, t.on, t.mode, prFor(t)?.base ?? null]); };
 
 // Per-repo maps in shared state (an empty value removes the repo's entry).
 const getIn = (name, ck, fallback) => (shared(name) ?? {})[ck] ?? fallback;
@@ -143,11 +153,10 @@ export function onScreen() {
   return Boolean(spaces().find((s) => s.active)?.tabs.find((t) => t.name === name)?.active);
 }
 
-// Opens the terminal's review tab, or shows it, at `path` when given, with the file list beside it. With `pr` (a
-// Stack pane click) the tab shows that PR; from a review tab it keeps its PR; else (⌘⇧G, an agent pane's file list)
-// the terminal's own worktree. Entries for terminals that are gone are dropped on the way.
-export function openTab(path, pr) {
-  const t = target();
+// Opens the terminal's review tab, or shows it, at `path` when given, with the file list beside it. It never changes
+// what the review shows. Entries for terminals that are gone are dropped on the way.
+export function openTab(path) {
+  const t = terminalTarget();
   if (!t.terminal) { notify({ title: "Focus a terminal first", body: "A review tab belongs to the terminal it was opened from.", level: "warning" }); return; }
   const live = new Set(terminals().filter((k) => k.state === "live").map((k) => k.address));
   const alive = (obj) => Object.fromEntries(Object.entries(obj ?? {}).filter(([k]) => live.has(k)));
@@ -155,9 +164,7 @@ export function openTab(path, pr) {
   const opens = alive(shared("review.open"));
   if (path) opens[t.terminal] = { path, at: Date.now() }; else delete opens[t.terminal];
   setShared("review.open", opens);
-  const picks = alive(picksOf());
-  if (pr) picks[t.terminal] = { url: pr.url, branch: pr.branch, dir: pr.dir }; else if (!t.pick) delete picks[t.terminal];
-  setShared("review.pick", picks);
+  setShared("review.views", alive(shared("review.views")));
   const tabs = alive(tabsOf()), space = spaces().find((s) => s.active);
   const existing = tabs[t.terminal] && space?.tabs.find((x) => x.name === tabs[t.terminal].name);
   if (existing) run("tab.select", { id: existing.id });

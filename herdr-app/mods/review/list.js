@@ -1,9 +1,10 @@
-// The right sidebar: the focused terminal's changed files (a review tab's terminal while one is focused), the
-// Branch / Uncommitted / Since sent switch, and commit. Clicking a file opens that terminal's review tab at the file.
+// The right sidebar (Changes): the files of what the focused terminal's review shows (a review tab's terminal while one
+// is focused; its own worktree or the stack PR chosen in the Stack pane), its Branch / Uncommitted / Since sent switch,
+// and commit. Clicking a file opens that terminal's review tab at the file; it never changes what the review shows.
 import { div } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input, Scrollbar } from "gpui-base";
-import { exec, shared, setShared, theme } from "herdr";
-import { mode, target, key, openTab } from "./state.js";
+import { exec, shared, theme } from "herdr";
+import { mode, target, key, openTab, setView, prFor } from "./state.js";
 import { C, STATUS } from "./git.js";
 import { RepoView } from "./repo.js";
 
@@ -53,7 +54,9 @@ export class ReviewList extends RepoView {
     const modeButton = (id, label) => div().id(`mode-${id}`).px(6).py(1).rounded(4).text_size(10.5).cursor_pointer()
       .when(mode() === id, (e) => e.bg(t.selected).text_color(t.foreground))
       .when(mode() !== id, (e) => e.text_color(t.dim).hover((s) => s.text_color(t.foreground)))
-      .on_click(() => setShared("review.mode", id)).child(label);
+      .on_click(() => setView(target().terminal, { mode: id })).child(label);
+    // What this review shows: the stack PR chosen in the Stack pane, or the terminal's own worktree.
+    const tg = target(), pr = tg.pick && prFor(tg), what = tg.terminal ? (pr ? `#${pr.number} ${pr.title}` : "This worktree") : null;
     const empty = this.error || (this.loading ? "Loading changes…" : this.root ? ({ branch: "No changes on this branch", uncommitted: "No uncommitted changes", sent: "No changes since your last send" }[mode()]) : "No folder");
     return this.notes(this.frame(t, cx)
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
@@ -62,7 +65,7 @@ export class ReviewList extends RepoView {
         .child(div().flex_1())
         .child(div().text_size(11).text_color(C.green).child(`+${add}`)).child(div().text_size(11).text_color(C.red).child(`−${del}`)))
       .when(Boolean(this.baseNote), (e) => e.child(div().px(12).py(4).text_size(11).text_color(t.dim).child(this.baseNote)))
-      .when(mode() === "branch" && Boolean(this.baseName), (e) => e.child(div().px(14).pt(6).text_size(10.5).text_color(t.dim).child(`vs ${this.baseName}`)))
+      .when(Boolean(what), (e) => e.child(div().px(14).pt(6).text_size(10.5).text_color(t.dim).truncate().child(`${what}${mode() === "branch" && this.baseName ? ` · vs ${this.baseName}` : ""}`)))
       .child(div().flex_1().min_h(0).relative()
         .child(v_flex().id("changes-list").absolute().inset_0().overflow_y_scroll().p(6).when(this.switching(), (e) => e.opacity(0.55)).children(this.files.map((f) => {
           const parts = f.path.split("/"), name = parts.pop();

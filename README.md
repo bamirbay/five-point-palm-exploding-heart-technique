@@ -15,7 +15,7 @@ The Herdr window:
 | `herdr-app/layouts/my-main.json` | The window: the stock `main` layout, plus the panes and the status bar badge below |
 | `herdr-app/mods/my-spaces` | Spaces list. A space can link to a Linear project; `cmd-l` opens it in the Linear app |
 | `herdr-app/mods/my-agents` | Agents list. Each row shows its repo, branch, Linear issue and PR (with CI and review state). Sub-agents can open beside the focused pane |
-| `herdr-app/mods/review` | The right sidebar lists changed files: the branch's, the uncommitted ones, or only what changed since your last Send. The review tab shows every file's diff in one scroll, with line comments sent to the agent. The Stack pane lists the focused agent's stacks of PRs: a click opens its review tab on that PR (from the PR's worktree), and Send tells the agent which PR |
+| `herdr-app/mods/review` | Each agent's review shows one thing: its own worktree, or a PR of its stacks, chosen in the Stack pane. The Changes sidebar lists that review's files (the branch's, the uncommitted ones, or only what changed since your last Send) and the review tab shows every file's diff in one scroll, with line comments sent to the agent. Both show the same, and opening the tab never changes it. For a stack PR, Send tells the agent which PR |
 | `herdr-app/mods/work` | The PR pane, the Linear pane and the status bar badge. The badge polls GitHub and Linear and posts PR alerts |
 | `herdr-app/mods/my-tabs` | The tab bar, with **PRs** (a red dot when a PR needs you), **Stack**, **Linear** and **Changes** buttons on the right. It also handles `cmd-w` and `cmd-shift-s`, because it is always on screen |
 | `herdr-app/mods/my-pane` | Each pane's header. After the name it shows the branch's Linear issue and PR. Its close button follows the `cmd-w` rules |
@@ -65,9 +65,9 @@ Or tell your Claude: "add the Herdr setup from this repo".
 | `cmd-w`, `cmd-shift-w` | Close the pane. A terminal's pane asks first (Enter closes, Esc cancels). On a sub-agent, it goes back under its parent and keeps running. Never closes a space's last pane |
 | `cmd-k` | Clear the terminal |
 | `cmd-l` | Open the space's Linear project, or link one |
-| `cmd-shift-g` | Review tab for the focused terminal |
+| `cmd-shift-g` | Review tab for the focused terminal, as you left it |
 | `cmd-shift-i` / `cmd-shift-l` | PR pane / Linear pane (again: hide) |
-| `cmd-shift-k` | Stack pane (again: hide). Stacks are GitHub's (PRs in none are grouped by base branch). An agent's stacks are the ones its `stack.<name>` labels name (`hc label $HC_TERMINAL_ID stack.<name>=<GitHub stack URL>`, or **Link** in the pane), plus the one its own branch is in. In its review tab, `[` / `]` step through their PRs |
+| `cmd-shift-k` | Stack pane (again: hide). Stacks are GitHub's (PRs in none are grouped by base branch). An agent's stacks are the ones its `stack.<name>` labels name (`hc label $HC_TERMINAL_ID stack.<name>=<GitHub stack URL>`, or **Link** in the pane), plus the one its own branch is in. Clicking a row (or **This worktree**) chooses what the agent's review shows. In the review tab, `[` / `]` step through the PRs |
 | `cmd-shift-s` | Open the focused agent's newest sub-agent to the right |
 
 The review tab takes the keyboard when it opens (or after any click in it). Its keys, while no comment is being written

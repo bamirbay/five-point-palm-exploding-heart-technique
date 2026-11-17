@@ -6,7 +6,7 @@
 import { div } from "gpui-kit";
 import { h_flex, v_flex, TextareaState, Textarea } from "gpui-base";
 import { panes, exec, hc, run, settings, shared, theme } from "herdr";
-import { mode, tied, target, key, prFor, viewedOf, setViewed, commentsOf, setComments, onScreen, stacksFor, setPick, showPanel } from "./state.js";
+import { mode, tied, target, key, prFor, viewedOf, setViewed, commentsOf, setComments, onScreen, stacksFor, choose, showPanel } from "./state.js";
 import { C, STATUS, anchor, message, loadDiffs, saveSent } from "./git.js";
 import { RepoView } from "./repo.js";
 
@@ -347,7 +347,7 @@ export class ReviewTab extends RepoView {
     const prs = stacksFor(tied()).flatMap((s) => s.prs).filter((p, i, a) => p.state === "OPEN" && p.dir && a.findIndex((q) => q.url === p.url) === i);
     if (!prs.length) { this.say("note", "No stack with local worktrees: see the Stack pane (⌘⇧K)"); cx.notify(); return; }
     const i = prs.findIndex((p) => p.url === target().pick?.url), j = Math.max(-1, Math.min(prs.length - 1, i + d));
-    if (j !== i) setPick(tied(), prs[j] ?? null);
+    if (j !== i) choose(tied(), prs[j] ?? null);
   }
 
   // Plain-letter keys, while no comment or preview has the keyboard; ⌘ / ctrl / alt chords stay the app's.

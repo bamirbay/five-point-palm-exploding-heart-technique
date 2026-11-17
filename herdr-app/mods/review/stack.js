@@ -1,10 +1,12 @@
-// The Stack pane (right panel, ⌘⇧K): the focused agent's stacks of open PRs (state.js stacksFor), each from the one on
-// main up (GitHub's stacks; base -> branch chains for PRs in none). A click opens that agent's review tab on the PR, from the PR's worktree; comments sent there go to the agent
-// and name the PR. Below: your other stacks, to link (the same label agents set themselves with hc label).
+// The Stack pane (right panel, ⌘⇧K): where you choose what the focused agent's review shows. First its own worktree,
+// then the PRs of its stacks (state.js stacksFor: GitHub's stacks, else base -> branch chains), each from the one on
+// main up. A click chooses it (state.js choose) and opens the review tab; the Changes sidebar shows the same. Comments
+// sent from a PR's review go to the agent and name the PR. Below: your other stacks, to link (the same label agents set
+// themselves with hc label).
 import { div } from "gpui-kit";
 import { h_flex, v_flex, Scrollbar } from "gpui-base";
 import { exec, panes, spaces, theme } from "herdr";
-import { target, stacksFor, allStacks, link, openTab, picksOf, commentsOf, stackUrl } from "./state.js";
+import { target, stacksFor, allStacks, link, openTab, viewOf, choose, commentsOf, stackUrl } from "./state.js";
 import { C } from "./git.js";
 
 const FAILED = new Set(["FAILURE", "ERROR"]), MERGED = "#a371f7";
@@ -34,7 +36,7 @@ export class StackPane {
   }
 
   render(cx) {
-    const t = theme(), terminal = target().terminal, stacks = stacksFor(terminal), picked = picksOf()[terminal]?.url;
+    const t = theme(), terminal = target().terminal, stacks = stacksFor(terminal), picked = viewOf(terminal).pr?.url;
     const pane = panes().find((p) => p.terminal === terminal), tab = spaces().flatMap((s) => s.tabs).find((x) => x.id === pane?.tab);
     const chip = (id, label, action) => div().id(id).flex_none().px(6).py(1).rounded(4).border_1().border_color(t.border).text_size(12).text_color(t.dim)
       .cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground)).on_click((_e, cx) => { cx.stop_propagation(); action(cx); }).child(label);
@@ -50,7 +52,7 @@ export class StackPane {
         : p.review === "APPROVED" ? ["Approved", C.green] : p.review === "CHANGES_REQUESTED" ? ["Changes requested", C.red] : ["Waiting on review", C.amber];
       return v_flex().id(`st-${si}-${p.url}`).flex_none().px(8).py(6).gap(3).rounded(7).text_size(12)
         .when(picked === p.url, (e) => e.bg(t.selected))
-        .when(open && Boolean(p.dir), (e) => e.cursor_pointer().hover((s) => s.bg(t.hover)).on_click(() => openTab(null, p)))
+        .when(open && Boolean(p.dir), (e) => e.cursor_pointer().hover((s) => s.bg(t.hover)).on_click(() => { choose(terminal, p); openTab(); }))
         .when(open && !p.dir, (e) => e.opacity(0.5).tooltip("No local worktree for this branch"))
         .child(h_flex().gap(8).items_center()
           .child(div().w(18).flex_none().text_color(t.dim).child(`${i + 1}`))
@@ -78,8 +80,8 @@ export class StackPane {
     const unlink = (s, si) => s.key && chip(`unlink-${si}`, "Unlink", (cx) => this.act(cx, () => link(terminal, s.key, null)));
     const section = (s, si) => [
       s.prs.length ? stackLine(`sec-${si}`, s.prs,
-        s.prs[0].stack && chip(`gh-stack-${si}`, `#${s.prs[0].stack}`, () => { exec("open", [stackUrl(s.prs[0])]).catch(() => null); }).tooltip("Open the stack on GitHub"), unlink(s, si)).when(si > 0, (e) => e.mt(10))
-        : h_flex().id(`sec-${si}`).flex_none().h(28).px(8).gap(8).items_center().when(si > 0, (e) => e.mt(10))
+        s.prs[0].stack && chip(`gh-stack-${si}`, `#${s.prs[0].stack}`, () => { exec("open", [stackUrl(s.prs[0])]).catch(() => null); }).tooltip("Open the stack on GitHub"), unlink(s, si)).mt(10)
+        : h_flex().id(`sec-${si}`).flex_none().h(28).px(8).gap(8).items_center().mt(10)
           .child(div().flex_1().text_size(12).text_color(t.muted).child("Linked PR no longer open")).children([unlink(s, si)].filter(Boolean)),
       ...s.prs.map(row(si)),
     ];
@@ -87,9 +89,14 @@ export class StackPane {
     const others = terminal ? allStacks().filter((s) => !shown.has(s[0].url)) : [];
     const who = tab?.name || pane?.program?.name || terminal;
     const status = !terminal ? "Focus an agent" : !stacks.length ? "No stack for this agent" : `comments go to ${who}`;
-    const label = (text) => div().px(8).pt(stacks.length ? 16 : 4).pb(4).text_size(11).text_color(t.dim).child(text);
-    const body = [...stacks.flatMap(section), ...(others.length ? [label(stacks.length ? "Link another" : "Link one of your stacks"), ...others.map(stackRow)] : [])];
-    if (terminal && !body.length) body.push(dim("You have no stacked PRs open."));
+    const label = (text) => div().px(8).pt(16).pb(4).text_size(11).text_color(t.dim).child(text);
+    // The agent's own changes: what its review shows unless a stack PR is chosen.
+    const own = terminal && h_flex().id("own").flex_none().h(28).px(8).gap(8).items_center().rounded(7).cursor_pointer()
+      .when(!picked, (e) => e.bg(t.selected)).hover((s) => s.bg(t.hover)).on_click(() => { choose(terminal, null); openTab(); })
+      .child(div().flex_none().text_size(12).font_semibold().child("This worktree"))
+      .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(pane?.branch ?? ""));
+    const body = [...(own ? [own] : []), ...stacks.flatMap(section), ...(others.length ? [label(stacks.length ? "Link another" : "Link one of your stacks"), ...others.map(stackRow)] : [])];
+    if (terminal && !stacks.length && !others.length) body.push(dim("You have no stacked PRs open."));
 
     return v_flex().id("stack").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border)
       .text_color(t.foreground).text_size(13).track_focus(this.handle)
