@@ -44,7 +44,6 @@ export class StackPane {
     const stackRow = (s) => h_flex().id(`link-${s[0].url}`).flex_none().px(8).py(6).gap(8).items_center().rounded(7)
       .child(div().flex_none().text_size(12).font_semibold().child(s[0].repo))
       .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(short(s[0].title)))
-      .child(div().flex_none().text_size(11).text_color(t.dim).child(`#${s[0].number}…#${s.at(-1).number} (${s.length})`))
       .child(chip(`do-link-${s[0].url}`, "Link", (cx) => this.act(cx, () => link(terminal, `stack.${s[0].number}`, s.at(-1).url))));
     // A stack's heading (repo, its bottom PR's title, count), with Unlink when a label made it (not for the agent's own branch's).
     const section = (s, si) => [
