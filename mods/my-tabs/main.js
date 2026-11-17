@@ -62,35 +62,6 @@ export default class Tabs extends View {
         cx.notify();
       }
     });
-    this.panels = JSON.parse(localStorage.getItem("panels") ?? "{}");
-  }
-
-  // The side panel is remembered per space: switching shows that space's choice
-  // (closed if it never had one), and opening or closing it records it.
-  syncPanel(space, panel, body, enabled) {
-    if (!space || !panel) return;
-    const now = panel.hidden ? null : body?.active ?? null;
-    if (space.id !== this.space) {
-      const first = this.space === undefined;
-      this.space = space.id; this.pending = null;
-      if (!(first && !(space.id in this.panels))) {
-        const stored = this.panels[space.id] ?? null, want = enabled.includes(stored) ? stored : null;
-        if (want !== now) {
-          this.pending = { want, until: Date.now() + 1000 };
-          if (want) { run("layout.select", { stack: "panel-body", child: want }); run("layout.show", { id: "panel" }); }
-          else run("layout.hide", { id: "panel" });
-          return;
-        }
-      }
-    }
-    // Until the restore lands (or something else won), the old state isn't a choice.
-    if (this.pending) {
-      if (this.pending.want !== now && Date.now() < this.pending.until) return;
-      this.pending = null;
-    }
-    if (this.panels[space.id] === now) return;
-    this.panels[space.id] = now;
-    localStorage.setItem("panels", JSON.stringify(this.panels));
   }
 
   render() {
@@ -128,7 +99,6 @@ export default class Tabs extends View {
     const panel = find(root, "panel"), body = find(root, "panel-body");
     // PRs and Linear (the work mod's panes) are always on.
     const enabled = [...(shared("workspace.panels") ?? ["files", "changes"]), "prs", "linear"];
-    this.syncPanel(space, panel, body, enabled);
     const panelButton = (id, label, icon, dot = false) => {
       const on = panel && !panel.hidden && body?.active === id;
       return h_flex().id(`panel-${id}`).h(26).px(8).gap(5).flex_none().items_center().rounded(6)
