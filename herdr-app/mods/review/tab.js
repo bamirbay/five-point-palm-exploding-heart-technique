@@ -52,10 +52,10 @@ export class ReviewTab extends RepoView {
   constructor(cx) {
     super(cx);
     this.areaH = 0; this.areaW = 0;
-    this.composer = TextareaState.new({ placeholder: "Comment · ⌘↵ saves · Esc cancels" });
+    this.composer = TextareaState.new({ placeholder: "Comment · ↵ saves · ⇧↵ new line · Esc cancels" });
     this.composer.set_auto_grow(1, 6);
-    // ⌘↵ saves; a plain Enter stays a new line in the comment.
-    this.composer.on("submit", (e, cx) => { if (e?.secondary) this.saveComment(cx); });
+    // ↵ (or ⌘↵) saves; ⇧↵ is a new line. A newline the box added on ↵ goes with the trim in saveComment.
+    this.composer.on("submit", (e, cx) => { if (!e?.shift) this.saveComment(cx); });
   }
 
   // A context switch keeps the old rows on screen (dimmed) until the new diff replaces them; per-view choices go.
