@@ -47,7 +47,7 @@ export class StackPane {
       const open = p.state === "OPEN", drafts = p.dir ? commentsOf(`comments:${JSON.stringify([null, p.dir])}`).length : 0;
       const ci = open && p.ci ? (p.ci === "SUCCESS" ? ["✓", C.green] : FAILED.has(p.ci) ? ["✗", C.red] : ["●", C.amber]) : null;
       const [word, color] = p.state === "MERGED" ? ["Merged", MERGED] : p.state === "CLOSED" ? ["Closed", t.dim] : p.draft ? ["Draft", t.dim]
-        : p.review === "APPROVED" ? ["Approved", C.green] : p.review === "CHANGES_REQUESTED" ? ["Changes requested", C.red] : ["No review yet", t.dim];
+        : p.review === "APPROVED" ? ["Approved", C.green] : p.review === "CHANGES_REQUESTED" ? ["Changes requested", C.red] : ["Waiting on review", C.amber];
       return v_flex().id(`st-${si}-${p.url}`).flex_none().px(8).py(6).gap(3).rounded(7).text_size(12)
         .when(picked === p.url, (e) => e.bg(t.selected))
         .when(open && Boolean(p.dir), (e) => e.cursor_pointer().hover((s) => s.bg(t.hover)).on_click(() => openTab(null, p)))
@@ -58,7 +58,7 @@ export class StackPane {
           .child(chip(`gh-${si}-${p.url}`, `#${p.number}`, () => { exec("open", [p.url]).catch(() => null); }).tooltip("Open on GitHub")))
         .child(h_flex().pl(26).gap(8).items_center()
           .child(div().w(116).flex_none().truncate().text_color(color).child(word))
-          .child(h_flex().flex_1().min_w(0).gap(4).items_center().when(Boolean(ci), (e) => e.child(div().text_color(ci[1]).child(ci[0])).child(div().text_color(t.dim).child("CI"))))
+          .child(h_flex().flex_1().min_w(0).gap(4).items_center().when(Boolean(ci), (e) => e.child(div().text_color(ci[1]).child(ci[0])).child(div().text_color(ci[1]).child("CI"))))
           .when(drafts > 0, (e) => e.child(div().flex_none().text_color(C.hunkText).child(`${drafts} unsent comment${drafts === 1 ? "" : "s"}`))));
     };
     // A stack's line: repo, name (a GitHub stack's name opens its page), then what goes on the right. Section headings
