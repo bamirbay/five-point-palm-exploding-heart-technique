@@ -39,7 +39,7 @@ function find(node, id) {
   return null;
 }
 
-// The right panel's panes (files, changes, prs, linear): the buttons, cmd-shift-i / cmd-shift-l and the work badge
+// The right panel's panes (files, changes, prs, stack, linear): the buttons, cmd-shift-i / -k / -l and the work badge
 // toggle one (again while it shows: hide the panel); a PR alert's click only shows the PR pane.
 const showing = (id) => { const root = layout(); return !find(root, "panel")?.hidden && find(root, "panel-body")?.active === id; };
 function showPanel(id) { run("layout.select", { stack: "panel-body", child: id }); run("layout.show", { id: "panel" }); }
@@ -54,7 +54,7 @@ export default class Tabs extends View {
         try {
           if (command === "close") closePane();
           if (command === "beside") beside();
-          if (command === "prs" || command === "linear") togglePanel(command);
+          if (command === "prs" || command === "stack" || command === "linear") togglePanel(command);
           if (command === "showprs") showPanel("prs");
         } catch (e) {
           notify({ title: `${command} failed`, body: String(e?.message ?? e).slice(0, 300), level: "error" });
@@ -146,6 +146,7 @@ export default class Tabs extends View {
       .child(button("tab-new", "+", () => openOverlay({ mod: "new-menu", kind: "popup", width: 250, height: 512 })))
       .when(enabled.includes("files"), el => el.child(panelButton("files", "Files", "mods/files/file.svg")))
       .child(panelButton("prs", "PRs", "mods/my-tabs/pr.svg", needsYou))
+      .child(panelButton("stack", "Stack", "mods/my-tabs/stack.svg"))
       .child(panelButton("linear", "Linear", "mods/my-tabs/linear.svg"))
       .when(enabled.includes("changes"), el => el.child(panelButton("changes", "Changes", "mods/changes/changes.svg")))
       .when(w?.buttons, el => el.child(button("minimize", w.platform === "windows" ? svg("mods/my-tabs/win-min.svg").size(16) : "−", () => run("window.minimize")))

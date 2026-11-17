@@ -51,9 +51,9 @@ export function anchor(path, rows) {
   return `${path}${at ? `:${at}` : ""}${rows.every((r) => r.kind === "-") ? " (removed)" : ""}`;
 }
 
-// The message an agent gets. A comment's later lines are indented under its bullet.
-export function message(comments) {
-  return ["Review comments:", ...comments.map((c) => `- ${c.at}${c.quote ? ` \`${c.quote}\`` : ""} — ${c.text.replace(/\n/g, "\n  ")}`)].join("\n");
+// The message an agent gets (`where`: which PR, for a stack PR's review). A comment's later lines are indented under its bullet.
+export function message(comments, where) {
+  return [`Review comments${where ? ` on ${where}` : ""}:`, ...comments.map((c) => `- ${c.at}${c.quote ? ` \`${c.quote}\`` : ""} — ${c.text.replace(/\n/g, "\n  ")}`)].join("\n");
 }
 
 // A short fingerprint of a file's diff, so "viewed" ends when the file changes.

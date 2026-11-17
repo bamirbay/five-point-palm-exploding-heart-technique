@@ -10,7 +10,7 @@ import { v_flex, h_flex } from "gpui-base";
 import { panes, spaces, focused, run, exec, hc, home, theme, shared, setShared, notify, props } from "herdr";
 
 // Settings: change to yours.
-const REPOS_DIR = "Developer/repos"; // under your home: where your git clones live (Clean up finds merged PRs' worktrees there)
+const REPOS_DIR = "Developer/repos"; // under your home: where your git clones live (each PR's local worktree is found there)
 
 const C = { green: "#3fb950", red: "#f85149", amber: "#d29922", blue: "#388bfd" };
 const REPOS = () => `${home()}/${REPOS_DIR}`;
@@ -56,7 +56,13 @@ async function fetchPRs() {
     return { ...p, ...prBadge(p) };
   };
   const list = (s) => (s?.nodes ?? []).filter((n) => n?.number).map(pr);
-  return { at: Date.now(), open: list(d.open), merged: list(d.merged), warning: j.errors?.[0]?.message ?? null };
+  const open = list(d.open), merged = list(d.merged), all = [...open, ...merged];
+  // Each PR's local worktree (dir): the Stack review reads open PRs' code there, Clean up removes merged ones'.
+  // shortcut: looked up once per poll, so a worktree made since shows after the next one (or Refresh).
+  const repos = [...new Set(all.map((p) => p.repo))];
+  const trees = Object.fromEntries(await Promise.all(repos.map(async (r) => [r, await worktrees(`${REPOS()}/${r}`).catch(() => ({}))])));
+  for (const p of all) p.dir = trees[p.repo][p.branch] ?? null;
+  return { at: Date.now(), open, merged, warning: j.errors?.[0]?.message ?? null };
 }
 
 // What every view shows for a PR: "#12 ✓ approved". tone "bad" (CI failed, changes requested) is red, "good" (approved) green.
@@ -281,7 +287,7 @@ async function cleanup(p, confirmed) {
 export default class Work extends View {
   init(_props, cx) {
     this.view = props()?.view ?? null;
-    this.trees = {}; this.busy = {}; this.confirm = null;
+    this.busy = {}; this.confirm = null;
     if (this.view !== "badge") return;
     cx.spawn(async () => { await refreshPRs(true); await refreshIssues(); });
     cx.timer.every(120000, () => { refreshPRs(true); });
@@ -329,18 +335,6 @@ export default class Work extends View {
     return div().w(14).flex_none().text_color(color).font_bold().child(mark);
   }
 
-  // Merged PRs' worktrees, looked up again whenever the PR list changes.
-  loadTrees(data, cx) {
-    if (!data?.at || this.treesAt === data.at) return;
-    this.treesAt = data.at;
-    cx.spawn(async (cx) => {
-      const trees = {};
-      for (const repo of new Set(data.merged.map((p) => p.repo))) trees[repo] = await worktrees(`${REPOS()}/${repo}`).catch(() => ({}));
-      this.trees = trees;
-      cx.notify();
-    });
-  }
-
   // Clean up's first click: check, then ask in the row (what goes, including ignored files), or say why not.
   askCleanup(p, dir, cx) {
     cx.spawn(async (cx) => {
@@ -363,7 +357,7 @@ export default class Work extends View {
   }
 
   prRow(t, p, merged) {
-    const s = sessionWhere((x) => isPR(p, x.branch, x.cwd)), dir = merged ? this.trees[p.repo]?.[p.branch] : null;
+    const s = sessionWhere((x) => isPR(p, x.branch, x.cwd)), dir = merged ? p.dir : null;
     const review = p.review === "APPROVED" ? ["approved", C.green] : p.review === "CHANGES_REQUESTED" ? ["changes requested", C.red] : null;
     // Comments go only to an agent: pasted into a plain shell, every line would run as a command.
     const agent = s?.pane.status ? s : null;
@@ -405,7 +399,6 @@ export default class Work extends View {
   // Its branch's PR (or "no PR yet") goes first, under "This pane".
   renderPRs(root, t, cx) {
     const data = shared("work.prs");
-    this.loadTrees(data, cx);
     const f = focused();
     if (f?.cwd) this.focus = { cwd: f.cwd, branch: panes().find((p) => p.pane === f.pane)?.branch ?? null };
     const repo = this.focus ? this.repoOf(this.focus.cwd, cx) : null, branch = this.focus?.branch;

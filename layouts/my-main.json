@@ -150,6 +150,14 @@
                       }
                     },
                     {
+                      "id": "stack",
+                      "type": "block",
+                      "content": {
+                        "mod": "review",
+                        "props": { "view": "stack" }
+                      }
+                    },
+                    {
                       "id": "linear",
                       "type": "block",
                       "content": {

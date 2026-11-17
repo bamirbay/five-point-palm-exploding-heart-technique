@@ -15,6 +15,7 @@
     "cmd-[": "agent.prev",
     "cmd-shift-l": "my-tabs.linear",
     "cmd-shift-i": "my-tabs.prs",
+    "cmd-shift-k": "my-tabs.stack",
     "cmd-n": "space.new",
     "cmd-p": "mod.open:picker",
     "cmd-shift-p": "app.palette",

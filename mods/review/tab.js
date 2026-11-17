@@ -6,7 +6,7 @@
 import { div } from "gpui-kit";
 import { h_flex, v_flex, TextareaState, Textarea } from "gpui-base";
 import { panes, exec, hc, run, settings, shared, theme } from "herdr";
-import { mode, tied, target, key, prFor, viewedOf, setViewed, commentsOf, setComments, onScreen } from "./state.js";
+import { mode, tied, target, key, prFor, viewedOf, setViewed, commentsOf, setComments, onScreen, stackFor, setPick, showPanel } from "./state.js";
 import { C, STATUS, anchor, message, loadDiffs, saveSent } from "./git.js";
 import { RepoView } from "./repo.js";
 
@@ -16,7 +16,7 @@ const KEYS = [
   ["j k  ↓ ↑", "next / previous line"], ["shift ↓ ↑", "extend the selection"], ["J K", "next / previous file"],
   ["space  shift-space", "page down / up"], ["g G", "top / bottom"], ["a  ⌘⇧C", "comment on the selection (double-click a line)"],
   ["v  ⌘E", "mark the file viewed"], ["o  ⌘⇧E", "only this file"], ["p  ⌘↵", "preview the comments, again to send"],
-  ["esc", "close · clear the selection"], ["?", "these keys"],
+  ["[ ]", "previous / next PR of the agent's stack"], ["esc", "close · clear the selection"], ["?", "these keys"],
 ];
 
 // A row's identity across rebuilds: its file, kind and line number (hunk and note rows by their text).
@@ -323,7 +323,7 @@ export class ReviewTab extends RepoView {
     cx.spawn(async (cx) => {
       try {
         const saved = await saveSent(root, on).then(() => "", (e) => ` · Since sent not saved: ${e.message ?? e}`);
-        const r = await hc(["send", pane.terminal, message(list)]);
+        const r = await hc(["send", pane.terminal, message(list, this.where())]);
         if (r.code !== 0) throw new Error((r.stderr || r.stdout).trim());
         // Only the comments that went: one saved meanwhile stays.
         const went = new Set(list.map((c) => JSON.stringify(c)));
@@ -336,6 +336,17 @@ export class ReviewTab extends RepoView {
       finally { this.busy = false; this.stale = true; cx.notify(); } // Since sent starts over from here
     });
     cx.notify();
+  }
+
+  // A stack PR's comments say which PR and worktree: file paths are the same in every worktree.
+  where() { const t = target(), p = t.pick && prFor(t); return p ? `PR #${p.number} (${p.branch}, worktree ${this.root})` : null; }
+
+  // [ / ]: the previous / next PR of the terminal's stack that has a local worktree; before the first, its own worktree.
+  stepPR(d, cx) {
+    const prs = stackFor(tied()).prs.filter((p) => p.dir);
+    if (!prs.length) { this.say("note", "No stack with local worktrees: see the Stack pane (⌘⇧K)"); cx.notify(); return; }
+    const i = prs.findIndex((p) => p.url === target().pick?.url), j = Math.max(-1, Math.min(prs.length - 1, i + d));
+    if (j !== i) setPick(tied(), prs[j] ?? null);
   }
 
   // Plain-letter keys, while no comment or preview has the keyboard; ⌘ / ctrl / alt chords stay the app's.
@@ -363,6 +374,8 @@ export class ReviewTab extends RepoView {
       case "o": once(() => this.toggleOnly(cx)); break;
       case "p": once(() => this.requestSend(cx)); break;
       case "?": this.help = !this.help; break;
+      case "[": once(() => this.stepPR(-1, cx)); break;
+      case "]": once(() => this.stepPR(1, cx)); break;
       default:
         if (e.key === "down" || e.key === "up") this.moveLine(e.key === "down" ? 1 : -1, m.shift);
         else if (e.key === "space" || e.key === "pagedown" || e.key === "pageup") this.top += (e.key === "pageup" || (e.key === "space" && m.shift) ? -page : page);
@@ -451,6 +464,7 @@ export class ReviewTab extends RepoView {
       if (this.only) this.only = want.path; else this.fold[want.path] = false;
     }
     const can = this.canComment(), list = this.comments(), pr = prFor(target()), viewedMap = viewedOf(this.commentsKey);
+    const stack = stackFor(tied()).prs, at = stack.findIndex((p) => p.url === target().pick?.url);
     this.layout(list, viewedMap);
     this.applyMoves();
     // From the loaded diff's file entries (new files' line counts are set there).
@@ -478,6 +492,7 @@ export class ReviewTab extends RepoView {
         .when(add > 0, (e) => e.child(div().text_size(11).text_color(C.green).child(`+${add}`)))
         .when(del > 0, (e) => e.child(div().text_size(11).text_color(C.red).child(`−${del}`)))
         .child(div().text_size(10.5).text_color(t.dim).child(mode() === "branch" ? `vs ${this.baseName ?? "origin/main"}` : mode() === "sent" ? "since your last send" : "uncommitted"))
+        .when(stack.length > 0, (e) => e.child(chip("stack", at >= 0 ? `‹ ${at + 1}/${stack.length} ›` : `stack · ${stack.length} PRs`, t.foreground, () => showPanel("stack")).tooltip("[ ] previous / next PR · click: the Stack pane")))
         .when(Boolean(pr), (e) => e.child(chip("pr", pr.label ?? `#${pr.number}`, TONE[pr.tone] ?? t.muted, () => { exec("open", [pr.url]).catch(() => null); })))
         .child(div().flex_1())
         .child(chip("keys", "? keys", null, (_e, cx) => { this.help = !this.help; cx.notify(); }))
@@ -514,7 +529,7 @@ export class ReviewTab extends RepoView {
       .when(Boolean(this.preview), (e) => e.child(v_flex().flex_none().p(10).gap(8).border_t(1).border_color(t.border)
         .child(div().text_size(11).text_color(t.dim).child(`This goes to ${panes().find((p) => p.terminal === tied())?.program?.name ?? tied()}:`))
         .child(div().max_h(180).child(v_flex().id("preview").max_h(180).overflow_y_scrollbar().p(8).rounded(6).bg(t.raised).font_family(settings().font_family ?? "JetBrains Mono").text_size(11.5)
-          .children(message(list).split("\n").map((l) => div().child(l || " ")))))
+          .children(message(list, this.where()).split("\n").map((l) => div().child(l || " ")))))
         .child(h_flex().gap(8).child(div().flex_1())
           .child(button("preview-cancel", "Cancel", false, (_e, cx) => { this.preview = null; this.handle.focus(); cx.notify(); }))
           .child(button("preview-send", this.busy === "send" ? "Sending…" : "Send ⌘↵", true, (_e, cx) => this.send(cx))))))

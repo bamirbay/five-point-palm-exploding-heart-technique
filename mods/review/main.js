@@ -2,13 +2,15 @@
 // - a launcher (mod.open, cmd-shift-g; an overlay without props.agent): opens or shows the focused terminal's review
 //   tab, then closes;
 // - a review tab (props.agent: the terminal it belongs to): every changed file's diff, comments to that agent (tab.js);
-// - the right sidebar: the changed files, mode switch and commit (list.js).
+// - the right sidebar: the changed files, mode switch and commit (list.js);
+// - the Stack pane (props.view "stack"): the focused agent's stack of PRs, each opening its review tab (stack.js).
 // Shared state and the terminal a review is about: state.js. Git reads and diff helpers: git.js. Refresh: repo.js.
 import { View, div } from "gpui-kit";
 import { props, closeOverlay, nextCommand } from "herdr";
 import { tied, openTab } from "./state.js";
 import { ReviewTab } from "./tab.js";
 import { ReviewList } from "./list.js";
+import { StackPane } from "./stack.js";
 
 export default class Review extends View {
   init(_props, cx) {
@@ -17,7 +19,7 @@ export default class Review extends View {
       cx.spawn(async () => { openTab(); closeOverlay(props().overlay); });
       return;
     }
-    this.view = tied() ? new ReviewTab(cx) : new ReviewList(cx);
+    this.view = tied() ? new ReviewTab(cx) : props()?.view === "stack" ? new StackPane(cx) : new ReviewList(cx);
     // keys.json "mod:review": review.comment / send / viewed / only (the tab); "focus" from pane.go.
     cx.spawn(async (cx) => {
       for (;;) {
