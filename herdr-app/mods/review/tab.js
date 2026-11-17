@@ -15,7 +15,7 @@ const TONE = { bad: C.red, good: C.green };
 const KEYS = [
   ["j k  ↓ ↑", "next / previous line"], ["shift ↓ ↑", "extend the selection"], ["J K", "next / previous file"],
   ["space  shift-space", "page down / up"], ["g G", "top / bottom"], ["a  ⌘⇧C", "comment on the selection (double-click a line)"],
-  ["v  ⌘E", "mark the file viewed"], ["o  ⌘⇧E", "only this file"], ["p  ⌘↵", "preview the comments, again to send"],
+  ["v  ⌘E", "mark the file viewed"], ["o  ⌘⇧E", "only this file"], ["⌘↵", "send the comments"], ["p", "preview the message first, again to send"],
   ["[ ]", "previous / next PR of the agent's stacks"], ["esc", "close · clear the selection"], ["?", "these keys"],
 ];
 
@@ -260,8 +260,8 @@ export class ReviewTab extends RepoView {
   }
 
   openComposer(editing, text, cx) {
-    // A comment being written isn't replaced: finish it (⌘↵) or close it (Esc) first.
-    if (this.editing && this.composer.value().trim()) { this.composer.focus(); this.say("note", "Save (⌘↵) or close (Esc) the open comment first"); cx.notify(); return; }
+    // A comment being written isn't replaced: finish it (↵) or close it (Esc) first.
+    if (this.editing && this.composer.value().trim()) { this.composer.focus(); this.say("note", "Save (↵) or close (Esc) the open comment first"); cx.notify(); return; }
     this.note = null; this.done = null; this.preview = null;
     this.editing = editing;
     this.composer.set_value(text);
@@ -298,16 +298,15 @@ export class ReviewTab extends RepoView {
     cx.notify();
   }
 
-  // p / ⌘↵ / Send: while writing, save the comment; else show the exact message; with it shown, send it.
-  requestSend(cx) {
+  // ⌘↵ / Send: while writing, save the comment; else send. p (preview): show the exact message first; again, or ⌘↵, sends.
+  requestSend(cx, preview = false) {
     if (this.editing) { this.saveComment(cx); return; }
     // ⌘↵ can reach both the comment box (save) and the review keys (send): one press only saves.
     if (Date.now() - (this.savedAt ?? 0) < 400) return;
-    if (this.preview) { this.send(cx); return; }
     if (!this.comments().length) { this.say("note", "No comments to send"); cx.notify(); return; }
     if (!this.canComment()) { this.say("note", `${tied()} isn't running an agent`); cx.notify(); return; }
-    this.preview = true;
-    cx.notify();
+    if (preview && !this.preview) { this.preview = true; cx.notify(); return; }
+    this.send(cx);
   }
 
   // Every comment on this repo in one message to the tab's agent, then back to that agent.
@@ -373,7 +372,7 @@ export class ReviewTab extends RepoView {
       case "a": once(() => this.startComment(cx)); break;
       case "v": once(() => this.toggleViewed(cx)); break;
       case "o": once(() => this.toggleOnly(cx)); break;
-      case "p": once(() => this.requestSend(cx)); break;
+      case "p": once(() => this.requestSend(cx, true)); break;
       case "?": this.help = !this.help; break;
       case "[": once(() => this.stepPR(-1, cx)); break;
       case "]": once(() => this.stepPR(1, cx)); break;
@@ -542,6 +541,6 @@ export class ReviewTab extends RepoView {
           .child(div().id("comment-input").flex_1().min_w(0).px(10).py(6).rounded(8).border_1().border_color(t.accent).cursor_text()
             .on_mouse_down("left", (_e, cx) => cx.stop_propagation()).child(Textarea.new(this.composer).w_full().text_size(12).text_color(t.foreground)))
           .when(this.editing?.index >= 0, (e) => e.child(button("comment-delete", "Delete", false, (_e, cx) => this.deleteComment(this.editing.index, cx))))
-          .child(button("comment-save", "Save ⌘↵", true, (_e, cx) => this.saveComment(cx)))))), t);
+          .child(button("comment-save", "Save ↵", true, (_e, cx) => this.saveComment(cx)))))), t);
   }
 }

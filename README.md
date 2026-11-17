@@ -79,7 +79,8 @@ The review tab takes the keyboard when it opens (or after any click in it). Its 
 | `J` / `K` | Next / previous file |
 | `space` / `shift-space`, `g` / `G` | Page down / up, top / bottom |
 | `a`, `cmd-shift-c`, double-click | Comment on the selected lines; a header's "＋ comment" comments on the whole file |
-| `p`, `cmd-enter` | Preview the message for the agent; again to send. In the comment box `enter` saves and `shift-enter` starts a new line |
+| `cmd-enter` | Send the comments to the agent. In the comment box, `enter` saves and `shift-enter` starts a new line |
+| `p` | Preview the message first; again (or `cmd-enter`) sends |
 | `v`, `cmd-e` | Mark the file viewed (it folds in place; it reopens if the file changes) |
 | `o`, `cmd-shift-e` | Show only this file (again: show all) |
 | `esc` | Close the help, preview or comment box, or clear the selection |
