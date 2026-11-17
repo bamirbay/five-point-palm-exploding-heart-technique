@@ -67,7 +67,7 @@ Or tell your Claude: "add the Herdr setup from this repo".
 | `cmd-l` | Open the space's Linear project, or link one |
 | `cmd-shift-g` | Review tab for the focused terminal |
 | `cmd-shift-i` / `cmd-shift-l` | PR pane / Linear pane (again: hide) |
-| `cmd-shift-k` | Stack pane (again: hide). An agent's stacks are the ones its `stack.<name>` labels name (`hc label $HC_TERMINAL_ID stack.<name>=<top PR url>`, or **Link** in the pane), plus the one its own branch is in. In its review tab, `[` / `]` step through their PRs |
+| `cmd-shift-k` | Stack pane (again: hide). Stacks are GitHub's (PRs in none are grouped by base branch). An agent's stacks are the ones its `stack.<name>` labels name (`hc label $HC_TERMINAL_ID stack.<name>=<GitHub stack URL>`, or **Link** in the pane), plus the one its own branch is in. In its review tab, `[` / `]` step through their PRs |
 | `cmd-shift-s` | Open the focused agent's newest sub-agent to the right |
 
 The review tab takes the keyboard when it opens (or after any click in it). Its keys, while no comment is being written

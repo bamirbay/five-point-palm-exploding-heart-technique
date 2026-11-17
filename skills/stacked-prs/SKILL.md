@@ -1,6 +1,6 @@
 ---
 name: stacked-prs
-description: Plan, build and maintain a stack of dependent PRs (each PR based on the one below), with implementer agents and review comments relayed to them. Use when work is too big for one review, when the user asks for a stack or for tickets that become PRs, or when review comments arrive for a PR of a stack.
+description: Plan, build and maintain a stack of dependent PRs (each PR based on the one below) as a GitHub stack, with implementer agents and review comments relayed to them. Use when work is too big for one review, when the user asks for a stack or for tickets that become PRs, or when review comments arrive for a PR of a stack.
 ---
 
 # Stacked PRs
@@ -22,22 +22,35 @@ description: Plan, build and maintain a stack of dependent PRs (each PR based on
 
 ## Build
 
-- Each PR gets its own branch and worktree, made off the branch below (the bottom one off origin/main):
+- Each PR gets its own branch and worktree, made off the branch below (the bottom one off origin/main). The user's
+  Stack review reads each PR from its worktree.
   `git fetch && git worktree add -b bekzat/<key>-<desc> .worktrees/<key>-<desc> <branch below>`
-- Open it against the branch below: `gh pr create --base <branch below>`.
+- PR title: `[<stack name>] <type>(<scope>): <summary> (<ISSUE-KEY>)`, for example
+  `[CAI processor] feat(coding-agent-insights): add the EXTRACT stage (AEI-2748)`.
+  - The stack name is 2–3 words for the feature, the same on every PR of the stack. Not the Linear project's name:
+    one project can have several stacks.
+  - No `[n/N]`: the GitHub stack keeps the order, and N goes stale as the stack grows.
+  - A PR outside a stack gets no tag.
+- Open it against the branch below: `gh pr create --base <branch below> --title "<title>"`.
+- Make it a GitHub stack with `gh stack link` (bottom to top; PR numbers, branches or URLs):
+  - first PRs: `gh stack link <bottom PR> <next PR>`. Its stack number is in the output and in the stack's URL,
+    `https://github.com/<owner>/<repo>/stack/<number>`.
+  - each new PR on top: `gh stack link <stack number> <new PR>`.
+  We keep one worktree per PR, so we use `gh stack link` and not gh stack's local branch commands (`init`, `add`,
+  `rebase`, `sync`).
 - Implementers: `hc run --bg --name <key> --cwd <worktree> claude "<ticket, task>. Report with hc send $HC_TERMINAL_ID when done or stuck."`
   Start a PR's implementer once the PR below it is pushed. Siblings can run in parallel.
 - Fix review findings in the PR below with new commits on top. Don't amend or rebase a PR that others build on.
 
-## Link the stack (in Herdr)
+## Link the stack to your session (in Herdr)
 
-After each PR opens, label your own terminal with the newest PR at the top of the stack. Name the label after the
-stack's first ticket:
+Once the GitHub stack exists, label your own terminal with its URL, named after the stack:
 
-`hc label $HC_TERMINAL_ID stack.<first ticket key>=<url of the top PR>`
+`hc label $HC_TERMINAL_ID stack.<stack name, kebab-case>=https://github.com/<owner>/<repo>/stack/<number>`
 
-One label per stack, so you can run several. The user's Stack pane (⌘⇧K) lists them for your session, and review
-comments from it come to you. Use the top PR: the bottom one merges first. To unlink one: `hc label $HC_TERMINAL_ID stack.<key>=`.
+One label per stack, so you can run several. The URL stays the same as the stack grows. The user's Stack pane (⌘⇧K)
+lists them for your session, and review comments from it come to you. To unlink one:
+`hc label $HC_TERMINAL_ID stack.<name>=`.
 
 ## Review comments
 
@@ -53,8 +66,11 @@ the same in every worktree: work in the named worktree.
    worktrees, so it does not do this.)
 4. Tell the user which PRs moved.
 
-## After the bottom PR merges
+## Merging
 
-In the next PR's worktree: `git fetch && git rebase --onto origin/main <merged branch>`, then
-`git push --force-with-lease` and `gh pr edit <number> --base main`. `--onto` drops the merged commits, also after a
-squash merge. Then remove the merged PR's worktree and branch.
+Only the user decides to merge. When they ask, `gh stack merge <stack number>` merges the stack (or up to a chosen PR)
+in one all-or-nothing step.
+
+After the bottom PR merges on its own: in the next PR's worktree, `git fetch && git rebase --onto origin/main <merged branch>`,
+then `git push --force-with-lease`, and `gh pr edit <number> --base main` if GitHub hasn't retargeted it. `--onto`
+drops the merged commits, also after a squash merge. Then remove the merged PR's worktree and branch.

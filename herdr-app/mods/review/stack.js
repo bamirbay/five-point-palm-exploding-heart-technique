@@ -1,10 +1,10 @@
 // The Stack pane (right panel, ⌘⇧K): the focused agent's stacks of open PRs (state.js stacksFor), each from the one on
-// main up. A click opens that agent's review tab on the PR, from the PR's worktree; comments sent there go to the agent
+// main up (GitHub's stacks; base -> branch chains for PRs in none). A click opens that agent's review tab on the PR, from the PR's worktree; comments sent there go to the agent
 // and name the PR. Below: your other stacks, to link (the same label agents set themselves with hc label).
 import { div } from "gpui-kit";
 import { h_flex, v_flex, Scrollbar } from "gpui-base";
 import { exec, panes, spaces, theme } from "herdr";
-import { target, stacksFor, allStacks, link, openTab, picksOf, commentsOf } from "./state.js";
+import { target, stacksFor, allStacks, link, openTab, picksOf, commentsOf, stackUrl } from "./state.js";
 import { C } from "./git.js";
 
 const FAILED = new Set(["FAILURE", "ERROR"]);
@@ -65,11 +65,13 @@ export class StackPane {
       .child(div().flex_none().text_size(12).font_semibold().child(prs[0].repo))
       .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(stackName(prs)))
       .children(right.filter(Boolean));
-    const stackRow = (s) => stackLine(`link-${s[0].url}`, s, chip(`do-link-${s[0].url}`, "Link", (cx) => this.act(cx, () => link(terminal, `stack.${s[0].number}`, s.at(-1).url))));
-    // A stack's heading and its PRs. Unlink when a label made it (not for the agent's own branch's stack).
+    const stackRow = (s) => stackLine(`link-${s[0].url}`, s, chip(`do-link-${s[0].url}`, "Link", (cx) => this.act(cx, () => link(terminal, `stack.${s[0].stack ?? s[0].number}`, stackUrl(s[0]) ?? s.at(-1).url))));
+    // A stack's heading (with its GitHub stack's number) and its PRs. Unlink when a label made it (not for the agent's
+    // own branch's stack).
     const unlink = (s, si) => s.key && chip(`unlink-${si}`, "Unlink", (cx) => this.act(cx, () => link(terminal, s.key, null)));
     const section = (s, si) => [
-      s.prs.length ? stackLine(`sec-${si}`, s.prs, div().flex_none().text_size(11).text_color(t.dim).child(`${s.prs.length} PRs`), unlink(s, si)).when(si > 0, (e) => e.mt(10))
+      s.prs.length ? stackLine(`sec-${si}`, s.prs,
+        s.prs[0].stack && chip(`gh-stack-${si}`, `#${s.prs[0].stack}`, () => { exec("open", [stackUrl(s.prs[0])]).catch(() => null); }).tooltip("Open the stack on GitHub"), unlink(s, si)).when(si > 0, (e) => e.mt(10))
         : h_flex().id(`sec-${si}`).flex_none().h(28).px(8).gap(8).items_center().when(si > 0, (e) => e.mt(10))
           .child(div().flex_1().text_size(12).text_color(t.muted).child("Linked PR no longer open")).children([unlink(s, si)].filter(Boolean)),
       ...s.prs.map(row(si)),

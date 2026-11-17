@@ -33,7 +33,7 @@ const PR_QUERY = `query($open: String!, $merged: String!) {
 }
 fragment pr on PullRequest {
   number title url isDraft state headRefName headRefOid baseRefName mergedAt updatedAt
-  repository { name nameWithOwner }
+  repository { name nameWithOwner } stack { number } stackEntry { position }
   reviewDecision
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
   reviewThreads(first: 100) { nodes { id isResolved } }
@@ -52,6 +52,7 @@ async function fetchPRs() {
       number: n.number, title: n.title, url: n.url, draft: n.isDraft, state: n.state, branch: n.headRefName, head: n.headRefOid, base: n.baseRefName,
       repo: n.repository.name, owner: n.repository.nameWithOwner, review: n.reviewDecision, updated: n.updatedAt, merged: n.mergedAt,
       ci: n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null, threads, unresolved: threads.length,
+      stack: n.stack?.number ?? null, position: n.stackEntry?.position ?? null, // its GitHub stack, if any
     };
     return { ...p, ...prBadge(p) };
   };

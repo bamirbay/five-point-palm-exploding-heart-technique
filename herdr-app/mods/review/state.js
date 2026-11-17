@@ -39,53 +39,61 @@ export function prFor({ branch, cwd }) {
   return [...(all?.open ?? []), ...(all?.merged ?? [])].find((p) => p.branch === branch && parts.includes(p.repo)) ?? null;
 }
 
-// ---- Stacks: open PRs chained by base -> branch. An agent has the ones its labels name, and the one its branch is in.
+// ---- Stacks: GitHub's stacks of open PRs (p.stack, p.position, from the work badge's poll); for PRs in none, the PRs
+// chained by base -> branch. An agent has the ones its labels name, and the one its own branch is in.
 
 export const picksOf = () => shared("review.pick") ?? {};
 const openPRs = () => shared("work.prs")?.open ?? [];
+export const stackUrl = (p) => (p?.stack ? `https://github.com/${p.owner}/stack/${p.stack}` : null);
 
-// The PRs chained to p in its repo, from the one on main up (a fork above p is walked depth first).
+// p's stack, bottom first: its GitHub stack in order; else the PRs chained to it in its repo (a fork above p is walked
+// depth first).
 export function chain(p, all = openPRs()) {
-  const mine = all.filter((x) => x.owner === p.owner), out = [p];
+  if (p.stack) return all.filter((x) => x.owner === p.owner && x.stack === p.stack).sort((a, b) => a.position - b.position);
+  const mine = all.filter((x) => x.owner === p.owner && !x.stack), out = [p];
   for (let x = mine.find((y) => y.branch === p.base); x && !out.includes(x); x = mine.find((y) => y.branch === x.base)) out.unshift(x);
   const up = (x) => { for (const y of mine.filter((y) => y.base === x.branch && !out.includes(y))) { out.push(y); up(y); } };
   up(p);
   return out;
 }
-// Every chain of 2+ open PRs, from each bottom PR (one whose base is no open PR's branch).
+// Every stack of 2+ open PRs: GitHub's, then chains from each bottom PR of the rest (one whose base is no PR's branch).
 export function allStacks(all = openPRs()) {
-  return all.filter((p) => !all.some((y) => y.owner === p.owner && y.branch === p.base)).map((p) => chain(p, all)).filter((s) => s.length > 1);
-}
-{
-  const pr = (n, base) => ({ owner: "o/r", url: `u${n}`, branch: `b${n}`, base });
-  const a = pr(1, "main"), b = pr(2, "b1"), c = pr(3, "b2"), d = pr(4, "main");
-  if (chain(b, [c, a, b, d]).map((p) => p.url).join() !== "u1,u2,u3" || allStacks([c, a, b, d]).length !== 1) throw new Error("stack self-check failed");
+  const gh = new Map(), loose = all.filter((p) => !p.stack);
+  for (const p of all) if (p.stack) gh.set(stackUrl(p), chain(p, all));
+  const bottoms = loose.filter((p) => !loose.some((y) => y.owner === p.owner && y.branch === p.base));
+  return [...gh.values(), ...bottoms.map((p) => chain(p, all))].filter((s) => s.length > 1);
 }
 
-// A terminal's stacks: one per "stack" or "stack.<name>" label (a PR URL; agents set them with hc label), plus the
-// one its own branch's PR is in. A label whose PR is no longer open stays as an empty stack, to unlink it.
+// The PR a stack label points at: a GitHub stack URL (.../owner/repo/stack/N) names any PR of that stack.
+function seedOf(url, all) {
+  const m = /github\.com\/([^/]+\/[^/]+)\/stack\/(\d+)/.exec(url);
+  return m ? all.find((p) => p.owner === m[1] && p.stack === Number(m[2])) : all.find((p) => p.url === url);
+}
+// A terminal's stacks: one per "stack" or "stack.<name>" label (a GitHub stack URL, or a PR URL; agents set them with
+// hc label), plus the one its own branch's PR is in. A label whose stack is gone stays as an empty one, to unlink it.
 export function stacksFrom(labels, own, all) {
   const out = [], shown = (url) => out.some((s) => s.prs.some((p) => p.url === url));
   for (const [key, url] of Object.entries(labels ?? {})) {
-    if (!/^stack(\..+)?$/.test(key) || !url || shown(url)) continue;
-    const seed = all.find((p) => p.url === url);
-    out.push({ key, prs: seed ? chain(seed, all) : [] });
+    if (!/^stack(\..+)?$/.test(key) || !url) continue;
+    const seed = seedOf(url, all);
+    if (!seed || !shown(seed.url)) out.push({ key, prs: seed ? chain(seed, all) : [] });
   }
   if (own && !shown(own.url)) { const prs = chain(own, all); if (prs.length > 1) out.push({ key: null, prs }); }
   return out;
 }
 {
-  const pr = (n, base) => ({ owner: "o/r", url: `u${n}`, branch: `b${n}`, base });
-  const all = [pr(1, "main"), pr(2, "b1"), pr(3, "b2"), pr(4, "main"), pr(5, "b4")];
-  const got = stacksFrom({ "stack.x": "u3", "stack.y": "u5", "stack.z": "u2", stack: "gone", other: "u1" }, all[1], all);
-  if (got.map((s) => s.prs.map((p) => p.url).join("|") || "-").join(" ") !== "u1|u2|u3 u4|u5 -") throw new Error("stacks self-check failed");
+  const pr = (n, base, stack = null, position = null) => ({ owner: "o/r", url: `u${n}`, branch: `b${n}`, base, stack, position });
+  const all = [pr(1, "main"), pr(2, "b1"), pr(3, "b2"), pr(4, "main"), pr(5, "b4"), pr(7, "b6", 9, 2), pr(6, "main", 9, 1)];
+  const got = stacksFrom({ "stack.x": "u3", "stack.y": "u5", "stack.z": "u2", stack: "gone", "stack.g": "https://github.com/o/r/stack/9", "stack.g2": "u7", other: "u1" }, all[1], all);
+  if (got.map((s) => s.prs.map((p) => p.url).join("|") || "-").join(" ") !== "u1|u2|u3 u4|u5 - u6|u7"
+    || allStacks(all).map((s) => s.map((p) => p.url).join("|")).join(" ") !== "u6|u7 u1|u2|u3 u4|u5") throw new Error("stacks self-check failed");
 }
 export function stacksFor(terminal) {
   if (!terminal) return [];
   const pane = panes().find((p) => p.terminal === terminal), own = prFor({ branch: pane?.branch, cwd: pane?.cwd });
   return stacksFrom(terminals().find((k) => k.address === terminal)?.labels, own?.state === "OPEN" ? own : null, openPRs());
 }
-// Sets a terminal's stack label `key` to the PR at `url` (none: unlinks), as an agent would with hc label.
+// Sets a terminal's stack label `key` to `url` (a stack or PR URL; none: unlinks), as an agent would with hc label.
 export async function link(terminal, key, url) {
   const r = await hc(["label", terminal, `${key}=${url ?? ""}`]);
   if (r.code !== 0) throw new Error((r.stderr || r.stdout).trim());
