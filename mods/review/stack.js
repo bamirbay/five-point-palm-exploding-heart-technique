@@ -35,20 +35,24 @@ export class StackPane {
         .when(Boolean(p.dir), (e) => e.cursor_pointer().hover((s) => s.bg(t.hover)).on_click(() => openTab(null, p)))
         .when(!p.dir, (e) => e.opacity(0.5).tooltip("No local worktree for this branch"))
         .child(div().w(18).flex_none().text_size(11).text_color(t.dim).child(`${i + 1}`))
-        .child(div().flex_none().text_size(12).text_color(TONE[p.tone] ?? t.muted).child(p.label ?? `#${p.number}`))
         .child(div().flex_1().min_w(0).truncate().child(short(p.title)))
+        .child(div().flex_none().text_size(12).text_color(TONE[p.tone] ?? t.muted).child(p.label ?? `#${p.number}`))
         .when(p.unresolved > 0, (e) => e.child(div().flex_none().text_size(11).text_color(C.amber).child(`${p.unresolved} thread${p.unresolved === 1 ? "" : "s"}`)))
         .when(drafts > 0, (e) => e.child(div().flex_none().px(4).rounded(4).bg(C.comment).text_size(10.5).child(`${drafts} draft${drafts === 1 ? "" : "s"}`)))
         .child(chip(`gh-${si}-${p.url}`, "↗", () => { exec("open", [p.url]).catch(() => null); }));
     };
     const stackRow = (s) => h_flex().id(`link-${s[0].url}`).flex_none().px(8).py(6).gap(8).items_center().rounded(7)
-      .child(div().flex_1().min_w(0).truncate().child(short(s[0].title)))
+      .child(div().flex_none().text_size(12).font_semibold().child(s[0].repo))
+      .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(short(s[0].title)))
       .child(div().flex_none().text_size(11).text_color(t.dim).child(`#${s[0].number}…#${s.at(-1).number} (${s.length})`))
       .child(chip(`do-link-${s[0].url}`, "Link", (cx) => this.act(cx, () => link(terminal, `stack.${s[0].number}`, s.at(-1).url))));
-    // A stack's heading (its bottom PR's title), with Unlink when a label made it (not for the agent's own branch's).
+    // A stack's heading (repo, its bottom PR's title, count), with Unlink when a label made it (not for the agent's own branch's).
     const section = (s, si) => [
       h_flex().id(`sec-${si}`).flex_none().px(8).pt(si ? 14 : 6).pb(2).gap(8).items_center()
-        .child(div().flex_1().min_w(0).truncate().text_size(11.5).font_semibold().text_color(t.muted).child(s.prs.length ? `${short(s.prs[0].title)} · ${s.prs.length} PRs` : "Linked PR no longer open"))
+        .when(!s.prs.length, (e) => e.child(div().flex_1().text_size(11.5).text_color(t.muted).child("Linked PR no longer open")))
+        .when(s.prs.length > 0, (e) => e.child(div().flex_none().text_size(11.5).font_semibold().child(s.prs[0]?.repo ?? ""))
+          .child(div().flex_1().min_w(0).truncate().text_size(11.5).text_color(t.muted).child(short(s.prs[0]?.title ?? "")))
+          .child(div().flex_none().text_size(11).text_color(t.dim).child(`${s.prs.length} PRs`)))
         .when(Boolean(s.key), (e) => e.child(chip(`unlink-${si}`, "Unlink", (cx) => this.act(cx, () => link(terminal, s.key, null))))),
       ...s.prs.map(row(si)),
     ];
