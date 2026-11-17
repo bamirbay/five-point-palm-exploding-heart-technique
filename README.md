@@ -12,38 +12,43 @@ The Herdr window:
 
 | Path | What |
 |---|---|
-| `layouts/my-main.json` | The window: the stock `main` layout, plus the panes and the status bar badge below |
-| `mods/my-spaces` | Spaces list. A space can link to a Linear project; `cmd-l` opens it in the Linear app |
-| `mods/my-agents` | Agents list. Each row shows its repo, branch, Linear issue and PR (with CI and review state). Sub-agents can open beside the focused pane |
-| `mods/review` | The right sidebar lists changed files: the branch's, the uncommitted ones, or only what changed since your last Send. The review tab shows every file's diff in one scroll, with line comments sent to the agent. The Stack pane lists the focused agent's stacks of PRs: a click opens its review tab on that PR (from the PR's worktree), and Send tells the agent which PR |
-| `mods/work` | The PR pane, the Linear pane and the status bar badge. The badge polls GitHub and Linear and posts PR alerts |
-| `mods/my-tabs` | The tab bar, with **PRs** (a red dot when a PR needs you), **Stack**, **Linear** and **Changes** buttons on the right. It also handles `cmd-w` and `cmd-shift-s`, because it is always on screen |
-| `mods/my-pane` | Each pane's header. After the name it shows the branch's Linear issue and PR. Its close button follows the `cmd-w` rules |
-| `keys.json` | Key bindings (see below) |
+| `herdr-app/layouts/my-main.json` | The window: the stock `main` layout, plus the panes and the status bar badge below |
+| `herdr-app/mods/my-spaces` | Spaces list. A space can link to a Linear project; `cmd-l` opens it in the Linear app |
+| `herdr-app/mods/my-agents` | Agents list. Each row shows its repo, branch, Linear issue and PR (with CI and review state). Sub-agents can open beside the focused pane |
+| `herdr-app/mods/review` | The right sidebar lists changed files: the branch's, the uncommitted ones, or only what changed since your last Send. The review tab shows every file's diff in one scroll, with line comments sent to the agent. The Stack pane lists the focused agent's stacks of PRs: a click opens its review tab on that PR (from the PR's worktree), and Send tells the agent which PR |
+| `herdr-app/mods/work` | The PR pane, the Linear pane and the status bar badge. The badge polls GitHub and Linear and posts PR alerts |
+| `herdr-app/mods/my-tabs` | The tab bar, with **PRs** (a red dot when a PR needs you), **Stack**, **Linear** and **Changes** buttons on the right. It also handles `cmd-w` and `cmd-shift-s`, because it is always on screen |
+| `herdr-app/mods/my-pane` | Each pane's header. After the name it shows the branch's Linear issue and PR. Its close button follows the `cmd-w` rules |
+| `herdr-app/keys.json` | Key bindings (see below) |
+| `herdr-app/CLAUDE.md` | Notes for agents that edit the mods (run `./install.sh` after an edit) |
 | `claude/CLAUDE.md` | Global Claude instructions, with the Herdr rules (sub-agents, reviewers). `~/.claude/CLAUDE.md` links here |
-| `claude/skills/` | Claude skills, each linked from `~/.claude/skills/`. grill-me (from mattpocock/skills), find-skills (vercel-labs/skills) and thermo-nuclear-code-quality-review (cursor/plugins) are copies of third-party skills: to update one, copy it again from its source |
-| `herdr-core/templates/` | The two PR reviewers, as `hc` templates |
+| `skills/` | Claude skills, each linked from `~/.claude/skills/`. grill-me (from mattpocock/skills), find-skills (vercel-labs/skills) and thermo-nuclear-code-quality-review (cursor/plugins) are copies of third-party skills: to update one, copy it again from its source |
+| `herdr-core/templates/` | The two PR reviewers, as `hc` templates. They need the `ponytail-review` skill (ponytail plugin) and `thermo-nuclear-code-quality-review` |
+| `install.sh` | Links everything into place (see Install) |
 
 ## Install
 
-1. Copy `layouts/my-main.json` and the six `mods/` folders into `~/.config/herdr-app/`.
-   Merge `keys.json` into yours: add its keys and sections, and don't overwrite keys you already use.
+1. Clone this repo anywhere and run `./install.sh`. It links each piece where Herdr and Claude read it:
+   - `herdr-app/keys.json`, `layouts/*.json` and each mod → `~/.config/herdr-app/`
+   - `herdr-core/templates/*.md` → `~/.config/herdr-core/templates/`
+   - `claude/CLAUDE.md` → `~/.claude/CLAUDE.md`, and each skill → `~/.claude/skills/`
+
+   It never replaces a real file: move yours away first (merge your own `keys.json` and `CLAUDE.md` into the repo's).
    Then run `herdr-app do layout.switch --name my-main`.
 2. Change the settings to yours:
-   - `mods/work/main.js` top: `REPOS_DIR`.
-   - `mods/my-agents/main.js` and `mods/my-pane/main.js`: `LINEAR`, the Linear workspace URL.
+   - `herdr-app/mods/work/main.js` top: `REPOS_DIR`.
+   - `herdr-app/mods/my-agents/main.js` and `herdr-app/mods/my-pane/main.js`: `LINEAR`, the Linear workspace URL.
 3. Linear: create a personal API key (Linear → Settings → Security & access).
    Run `security add-generic-password -s herdr-linear -a linear -w` and paste the key.
    The key stays in Keychain.
-4. Claude (paths assume this repo is `~/.config/herdr-app`):
-   - `ln -sf ~/.config/herdr-app/claude/CLAUDE.md ~/.claude/CLAUDE.md`
-   - Each skill: `ln -s ~/.config/herdr-app/claude/skills/<name> ~/.claude/skills/<name>`
-   - `herdr-core/templates/*.md` → `~/.config/herdr-core/templates/`.
-     These are the two PR reviewers. They need the `ponytail-review` skill (ponytail plugin) and `thermo-nuclear-code-quality-review`.
+4. Node for hooks:
    - If Claude hooks fail with `node: command not found` in agents started by `hc`: those programs get your login
      session's PATH (it has `~/.local/bin` and Homebrew) and don't read shell profiles, so node from nvm or mise is
      missing. Link it there, as Herdr does with `hc`: `ln -s "$(command -v node)" ~/.local/bin/node`.
      No restart needed. Re-link after you switch node versions.
+
+Herdr watches its own folder, not this repo: after editing anything in `herdr-app/`, run `./install.sh` again. Re-linking
+makes Herdr reload.
 
 Or tell your Claude: "add the Herdr setup from this repo".
 

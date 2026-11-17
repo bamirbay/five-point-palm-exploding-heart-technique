@@ -1,17 +1,4 @@
-# Track only the files we own; Herdr writes or replaces everything else.
-/*
-!/.gitignore
-!/keys.json
-!/layouts/
-/layouts/*
-!/layouts/my-*.json
-!/mods/
-/mods/*
-!/mods/my-*/
-!/mods/review/
-!/mods/work/
+# Herdr writes editor type hints into each mod folder.
 *.d.ts
 jsconfig.json
-!/README.md
-!/claude/
-!/herdr-core/
+.DS_Store
