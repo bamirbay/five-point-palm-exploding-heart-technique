@@ -1,6 +1,8 @@
-# Herdr setup
+# Five Point Palm Exploding Heart Technique
 
-A Herdr window for working with coding agents:
+My agent setup: a Herdr window for working with coding agents, plus the Claude instructions and skills it relies on.
+
+The Herdr window:
 - **Spaces** are projects. Each space can link to a Linear project.
 - **Tabs** are agent sessions.
 - **Review** shows a branch's diff. You comment on lines and send the comments to the agent.
@@ -18,7 +20,9 @@ A Herdr window for working with coding agents:
 | `mods/my-tabs` | The tab bar, with **PRs** (a red dot when a PR needs you), **Linear** and **Changes** buttons on the right. It also handles `cmd-w` and `cmd-shift-s`, because it is always on screen |
 | `mods/my-pane` | Each pane's header. After the name it shows the branch's Linear issue and PR. Its close button follows the `cmd-w` rules |
 | `keys.json` | Key bindings (see below) |
-| `extras/` | Pieces that live outside Herdr's folder (see Install) |
+| `claude/CLAUDE.md` | Global Claude instructions, with the Herdr rules (sub-agents, reviewers). `~/.claude/CLAUDE.md` links here |
+| `claude/skills/` | Claude skills, each linked from `~/.claude/skills/`. grill-me (from mattpocock/skills), find-skills (vercel-labs/skills) and thermo-nuclear-code-quality-review (cursor/plugins) are copies of third-party skills: to update one, copy it again from its source |
+| `herdr-core/templates/` | The two PR reviewers, as `hc` templates |
 
 ## Install
 
@@ -31,10 +35,11 @@ A Herdr window for working with coding agents:
 3. Linear: create a personal API key (Linear → Settings → Security & access).
    Run `security add-generic-password -s herdr-linear -a linear -w` and paste the key.
    The key stays in Keychain.
-4. Optional extras:
-   - `extras/herdr-core-templates/*.md` → `~/.config/herdr-core/templates/`.
-     These are the two PR reviewers. They need the `ponytail-review` and `thermo-nuclear-code-quality-review` Claude skills.
-   - `extras/CLAUDE.md` → append to `~/.claude/CLAUDE.md`. It tells agents how to use sub-agents and the reviewers.
+4. Claude (paths assume this repo is `~/.config/herdr-app`):
+   - `ln -sf ~/.config/herdr-app/claude/CLAUDE.md ~/.claude/CLAUDE.md`
+   - Each skill: `ln -s ~/.config/herdr-app/claude/skills/<name> ~/.claude/skills/<name>`
+   - `herdr-core/templates/*.md` → `~/.config/herdr-core/templates/`.
+     These are the two PR reviewers. They need the `ponytail-review` skill (ponytail plugin) and `thermo-nuclear-code-quality-review`.
    - If Claude hooks fail with `node: command not found` in agents started by `hc`: those programs get your login
      session's PATH (it has `~/.local/bin` and Homebrew) and don't read shell profiles, so node from nvm or mise is
      missing. Link it there, as Herdr does with `hc`: `ln -s "$(command -v node)" ~/.local/bin/node`.
