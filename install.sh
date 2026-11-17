@@ -6,7 +6,9 @@ set -e
 R=$(cd "$(dirname "$0")" && pwd)
 link() { # <path in this repo> <where it goes>
   if [ -e "$2" ] && [ ! -L "$2" ]; then echo "skipped $2: a real file is there (move it away, then run this again)"; return; fi
-  mkdir -p "$(dirname "$2")" && ln -sfn "$R/$1" "$2" && echo "linked $2"
+  # A new link renamed over the old one, so the file is never missing: Herdr writes a default keys.json (plain ⌘W
+  # closes the tab) the moment it is. shortcut: mv -h is macOS; on Linux it is mv -T.
+  mkdir -p "$(dirname "$2")" && ln -sfn "$R/$1" "$2.new" && mv -fh "$2.new" "$2" && echo "linked $2"
 }
 H=~/.config/herdr-app
 link herdr-app/keys.json "$H/keys.json"
