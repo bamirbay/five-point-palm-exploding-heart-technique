@@ -5,6 +5,7 @@ Keep replies short. Answer or result first, in a few lines. No recaps of what I 
 # Git
 - Branch: `bekzat/<issue-key>-<short-desc>`, lowercase (`bekzat/aei-1835-fix-dedupe`); no Linear issue: `bekzat/<short-desc>`.
 - Worktree: `<repo>/.worktrees/<everything after bekzat/>`, off origin/main: `git fetch && git worktree add -b bekzat/<name> .worktrees/<name> origin/main`. Never edit the main checkout; don't `git pull` it unless asked.
+- Work that needs more than one PR: use the `stacked-prs` skill.
 
 # Code
 Write code in ponytail mode (the `ponytail` skill): the smallest complete change.
