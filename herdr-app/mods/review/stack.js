@@ -7,7 +7,7 @@ import { exec, panes, spaces, theme } from "herdr";
 import { target, stacksFor, allStacks, link, openTab, picksOf, commentsOf } from "./state.js";
 import { C } from "./git.js";
 
-const TONE = { bad: C.red, good: C.green };
+const FAILED = new Set(["FAILURE", "ERROR"]);
 // "[Area] [5/8] feat(api): add y" -> "add y".
 const short = (title) => title.replace(/^(\[[^\]]*\]\s*)+/, "").replace(/^\w+(\([^)]*\))?!?:\s*/, "");
 if (short("[Entity Parsing] [5/8] feat(api): expose x") !== "expose x" || short("fix: y") !== "y") throw new Error("stack title self-check failed");
@@ -28,18 +28,25 @@ export class StackPane {
       .cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground)).on_click((_e, cx) => { cx.stop_propagation(); action(cx); }).child(label);
     const dim = (text) => div().p(8).text_size(12).text_color(t.dim).child(text);
 
+    // Title and the PR number (opens it on GitHub); under it, its status: CI, review, open threads, unsent comments.
     const row = (si) => (p, i) => {
-      const drafts = p.dir ? commentsOf(`comments:${JSON.stringify([null, p.dir])}`).length : 0;
-      return h_flex().id(`st-${si}-${p.url}`).flex_none().px(8).py(6).gap(8).items_center().rounded(7)
+      const drafts = p.dir ? commentsOf(`comments:${JSON.stringify([null, p.dir])}`).length : 0, n = (k, w) => `${k} ${w}${k === 1 ? "" : "s"}`;
+      const status = [
+        p.draft && ["draft", t.dim],
+        p.ci && (p.ci === "SUCCESS" ? ["✓ CI", C.green] : FAILED.has(p.ci) ? ["✗ CI", C.red] : ["• CI running", C.amber]),
+        p.review === "APPROVED" ? ["approved", C.green] : p.review === "CHANGES_REQUESTED" ? ["changes requested", C.red] : null,
+        p.unresolved > 0 && [n(p.unresolved, "thread"), C.amber],
+        drafts > 0 && [n(drafts, "unsent comment"), C.hunkText],
+      ].filter(Boolean);
+      return v_flex().id(`st-${si}-${p.url}`).flex_none().px(8).py(6).gap(2).rounded(7)
         .when(picked === p.url, (e) => e.bg(t.selected))
         .when(Boolean(p.dir), (e) => e.cursor_pointer().hover((s) => s.bg(t.hover)).on_click(() => openTab(null, p)))
         .when(!p.dir, (e) => e.opacity(0.5).tooltip("No local worktree for this branch"))
-        .child(div().w(18).flex_none().text_size(11).text_color(t.dim).child(`${i + 1}`))
-        .child(div().flex_1().min_w(0).truncate().child(short(p.title)))
-        .child(div().flex_none().text_size(12).text_color(TONE[p.tone] ?? t.muted).child(p.label ?? `#${p.number}`))
-        .when(p.unresolved > 0, (e) => e.child(div().flex_none().text_size(11).text_color(C.amber).child(`${p.unresolved} thread${p.unresolved === 1 ? "" : "s"}`)))
-        .when(drafts > 0, (e) => e.child(div().flex_none().px(4).rounded(4).bg(C.comment).text_size(10.5).child(`${drafts} draft${drafts === 1 ? "" : "s"}`)))
-        .child(chip(`gh-${si}-${p.url}`, "↗", () => { exec("open", [p.url]).catch(() => null); }));
+        .child(h_flex().gap(8).items_center()
+          .child(div().w(18).flex_none().text_size(11).text_color(t.dim).child(`${i + 1}`))
+          .child(div().flex_1().min_w(0).truncate().child(short(p.title)))
+          .child(chip(`gh-${si}-${p.url}`, `#${p.number}`, () => { exec("open", [p.url]).catch(() => null); }).tooltip("Open on GitHub")))
+        .when(status.length > 0, (e) => e.child(h_flex().pl(26).gap(8).text_size(11).children(status.map(([text, color]) => div().text_color(color).child(text)))));
     };
     const stackRow = (s) => h_flex().id(`link-${s[0].url}`).flex_none().px(8).py(6).gap(8).items_center().rounded(7)
       .child(div().flex_none().text_size(12).font_semibold().child(s[0].repo))
