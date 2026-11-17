@@ -10,7 +10,19 @@ import { C } from "./git.js";
 const FAILED = new Set(["FAILURE", "ERROR"]);
 // "[Area] [5/8] feat(api): add y" -> "add y".
 const short = (title) => title.replace(/^(\[[^\]]*\]\s*)+/, "").replace(/^\w+(\([^)]*\))?!?:\s*/, "");
-if (short("[Entity Parsing] [5/8] feat(api): expose x") !== "expose x" || short("fix: y") !== "y") throw new Error("stack title self-check failed");
+// A stack's name: the [tag] or commit scope most of its titles share ("Entity Parsing", "coding-agent-insights"), else
+// its first PR's title.
+const tag = (title) => /^\[([^\]]+)\]/.exec(title)?.[1] ?? /^\w+\(([^)]+)\)!?:/.exec(title)?.[1] ?? null;
+function stackName(prs) {
+  const count = {};
+  for (const p of prs) { const k = tag(p.title); if (k) count[k] = (count[k] ?? 0) + 1; }
+  const [best, n] = Object.entries(count).sort((a, b) => b[1] - a[1])[0] ?? [];
+  return n * 2 > prs.length ? best : short(prs[0].title);
+}
+if (short("[Entity Parsing] [5/8] feat(api): expose x") !== "expose x" || short("fix: y") !== "y"
+  || stackName([{ title: "[Entity Parsing] [5/8] feat(api): a" }, { title: "[Entity Parsing] [6/8] feat(api): b" }]) !== "Entity Parsing"
+  || stackName([{ title: "feat(core): a" }, { title: "feat(cai): b" }, { title: "feat(cai): c" }]) !== "cai"
+  || stackName([{ title: "feat(x): add a" }, { title: "feat(y): b" }]) !== "add a") throw new Error("stack title self-check failed");
 
 export class StackPane {
   constructor(cx) { this.handle = cx.focus_handle(); this.note = null; }
@@ -26,7 +38,7 @@ export class StackPane {
     const pane = panes().find((p) => p.terminal === terminal), tab = spaces().flatMap((s) => s.tabs).find((x) => x.id === pane?.tab);
     const chip = (id, label, action) => div().id(id).flex_none().px(6).py(1).rounded(4).border_1().border_color(t.border).text_size(11).text_color(t.dim)
       .cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground)).on_click((_e, cx) => { cx.stop_propagation(); action(cx); }).child(label);
-    const dim = (text) => div().p(8).text_size(12).text_color(t.dim).child(text);
+    const dim = (text) => div().px(8).py(6).text_size(12).text_color(t.dim).child(text);
 
     // Title and the PR number (opens it on GitHub); under it, its status: CI, review, open threads, unsent comments.
     const row = (si) => (p, i) => {
@@ -48,33 +60,33 @@ export class StackPane {
           .child(chip(`gh-${si}-${p.url}`, `#${p.number}`, () => { exec("open", [p.url]).catch(() => null); }).tooltip("Open on GitHub")))
         .when(status.length > 0, (e) => e.child(h_flex().pl(26).gap(8).text_size(11).children(status.map(([text, color]) => div().text_color(color).child(text)))));
     };
-    const stackRow = (s) => h_flex().id(`link-${s[0].url}`).flex_none().px(8).py(6).gap(8).items_center().rounded(7)
-      .child(div().flex_none().text_size(12).font_semibold().child(s[0].repo))
-      .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(short(s[0].title)))
-      .child(chip(`do-link-${s[0].url}`, "Link", (cx) => this.act(cx, () => link(terminal, `stack.${s[0].number}`, s.at(-1).url))));
-    // A stack's heading (repo, its bottom PR's title, count), with Unlink when a label made it (not for the agent's own branch's).
+    // A stack's line: repo, name, then what goes on the right. Section headings and Link rows share it.
+    const stackLine = (id, prs, ...right) => h_flex().id(id).flex_none().h(28).px(8).gap(8).items_center()
+      .child(div().flex_none().text_size(12).font_semibold().child(prs[0].repo))
+      .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(stackName(prs)))
+      .children(right.filter(Boolean));
+    const stackRow = (s) => stackLine(`link-${s[0].url}`, s, chip(`do-link-${s[0].url}`, "Link", (cx) => this.act(cx, () => link(terminal, `stack.${s[0].number}`, s.at(-1).url))));
+    // A stack's heading and its PRs. Unlink when a label made it (not for the agent's own branch's stack).
+    const unlink = (s, si) => s.key && chip(`unlink-${si}`, "Unlink", (cx) => this.act(cx, () => link(terminal, s.key, null)));
     const section = (s, si) => [
-      h_flex().id(`sec-${si}`).flex_none().px(8).pt(si ? 14 : 6).pb(2).gap(8).items_center()
-        .when(!s.prs.length, (e) => e.child(div().flex_1().text_size(11.5).text_color(t.muted).child("Linked PR no longer open")))
-        .when(s.prs.length > 0, (e) => e.child(div().flex_none().text_size(11.5).font_semibold().child(s.prs[0]?.repo ?? ""))
-          .child(div().flex_1().min_w(0).truncate().text_size(11.5).text_color(t.muted).child(short(s.prs[0]?.title ?? "")))
-          .child(div().flex_none().text_size(11).text_color(t.dim).child(`${s.prs.length} PRs`)))
-        .when(Boolean(s.key), (e) => e.child(chip(`unlink-${si}`, "Unlink", (cx) => this.act(cx, () => link(terminal, s.key, null))))),
+      s.prs.length ? stackLine(`sec-${si}`, s.prs, div().flex_none().text_size(11).text_color(t.dim).child(`${s.prs.length} PRs`), unlink(s, si)).when(si > 0, (e) => e.mt(10))
+        : h_flex().id(`sec-${si}`).flex_none().h(28).px(8).gap(8).items_center().when(si > 0, (e) => e.mt(10))
+          .child(div().flex_1().text_size(12).text_color(t.muted).child("Linked PR no longer open")).children([unlink(s, si)].filter(Boolean)),
       ...s.prs.map(row(si)),
     ];
-
     const shown = new Set(stacks.flatMap((s) => s.prs.map((p) => p.url)));
     const others = terminal ? allStacks().filter((s) => !shown.has(s[0].url)) : [];
-    const status = !terminal ? "Focus an agent" : !stacks.length ? "No stack for this agent" : stacks.length > 1 ? `${stacks.length} stacks` : "";
-    const body = [...stacks.flatMap(section), ...(others.length ? [dim(stacks.length ? "Link another:" : "Link one of your stacks:"), ...others.map(stackRow)] : [])];
+    const who = tab?.name || pane?.program?.name || terminal;
+    const status = !terminal ? "Focus an agent" : !stacks.length ? "No stack for this agent" : `comments go to ${who}`;
+    const label = (text) => div().px(8).pt(stacks.length ? 16 : 4).pb(4).text_size(11).text_color(t.dim).child(text);
+    const body = [...stacks.flatMap(section), ...(others.length ? [label(stacks.length ? "Link another" : "Link one of your stacks"), ...others.map(stackRow)] : [])];
     if (terminal && !body.length) body.push(dim("You have no stacked PRs open."));
 
     return v_flex().id("stack").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border)
       .text_color(t.foreground).text_size(13).track_focus(this.handle)
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
         .child(div().font_semibold().flex_none().child("Stack"))
-        .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(status)))
-      .when(stacks.length > 0, (e) => e.child(div().px(14).pt(6).text_size(10.5).text_color(t.dim).child(`Comments go to ${tab?.name || pane?.program?.name || terminal}`)))
+        .child(div().flex_1().min_w(0).truncate().text_size(11.5).text_color(t.dim).child(status)))
       .when(Boolean(this.note), (e) => e.child(div().px(10).py(6).text_size(11).text_color(C.red).child(this.note)))
       .child(div().flex_1().min_h(0).relative()
         .child(v_flex().id("stack-list").absolute().inset_0().overflow_y_scroll().p(6).gap(2).children(body))
