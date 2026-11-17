@@ -45,7 +45,22 @@ export function wrap(text, width) {
   });
 }
 
+// Wraps a diff line to `width` characters per line, keeping its spaces (indentation stays): at the last space in the
+// second half of the line, else mid-word. Tabs count as 4 spaces.
+export function codeLines(text, width) {
+  let rest = text.replace(/\t/g, "    ");
+  const out = [];
+  while (rest.length > width) {
+    const cut = rest.lastIndexOf(" ", width);
+    const at = cut > width / 2 ? cut + 1 : width;
+    out.push(rest.slice(0, at)); rest = rest.slice(at);
+  }
+  out.push(rest);
+  return out;
+}
+
 if ([0, 19, 20, 75, 1000].map((y) => indexAt([0, 20, 56, 76], y)).join() !== "0,0,1,2,2" || indexAt([0], 5) !== 0
+  || codeLines("  ab cd ef", 6).join("|") !== "  ab |cd ef" || codeLines("abcdefgh", 3).join("|") !== "abc|def|gh" || codeLines("\tx", 9).join("|") !== "    x"
   || wrap("aaa bbb ccc", 7).join("|") !== "aaa bbb|ccc" || wrap("x\ny", 5).join("|") !== "x|y" || wrap("abcdefghij", 4).join("|") !== "abcd|efgh|ij") throw new Error("review tab self-check failed");
 
 export class ReviewTab extends RepoView {
@@ -133,12 +148,19 @@ export class ReviewTab extends RepoView {
 
   // Characters per comment line at the current width (the comment font is about 7px a character).
   commentWidth() { return Math.max(24, Math.floor((this.areaW - 90) / 7)); }
-  size(it) { return it.type === "file" ? HEAD : it.type === "comment" ? 8 + LINE * wrap(`› ${it.c.text}`, this.commentWidth()).length : ROW; }
+  // Characters per diff line: the width beside the gutter (60px) in the 12px monospace font (0.6em, 7.2px a character).
+  codeWidth() { return Math.max(20, Math.floor((this.areaW - 72) / 7.25)); }
+  size(it) {
+    if (it.type === "file") return HEAD;
+    if (it.type === "comment") return 8 + LINE * wrap(`› ${it.c.text}`, this.commentWidth()).length;
+    const text = it.row?.text ?? "";
+    return it.row?.kind === "@" || text.length <= this.codeWidth() ? ROW : ROW * codeLines(text, this.codeWidth()).length;
+  }
 
   // Rebuilds items when something they show changed, keeping the row at the top of the view where it was.
   layout(list, viewedMap) {
-    // The selection isn't in here (rows read it when drawn); the wrap width is, as comment heights depend on it.
-    const memo = JSON.stringify([this.rowsVer, this.fold, this.only, list, viewedMap, this.commentWidth()]);
+    // The selection isn't in here (rows read it when drawn); the wrap widths are, as comment and line heights depend on them.
+    const memo = JSON.stringify([this.rowsVer, this.fold, this.only, list, viewedMap, this.commentWidth(), this.codeWidth()]);
     if (memo === this.memo) return;
     const keep = this.items.length && !this.jump ? this.anchorAt() : null;
     this.memo = memo;
@@ -391,12 +413,14 @@ export class ReviewTab extends RepoView {
     const { kind, number, text } = it.row;
     if (kind === "@") return div().w_full().px(12).h(ROW).flex_none().truncate().bg(C.hunk).text_color(C.hunkText).child(text);
     const tint = kind === "+" ? C.add : kind === "-" ? C.del : null, gutter = kind === "+" ? C.addGutter : kind === "-" ? C.delGutter : null;
-    return h_flex().w_full().h(ROW).flex_none()
+    // A long line wraps onto more rows (sized in size()); its number and sign stay on the first.
+    const lines = codeLines(text, this.codeWidth());
+    return h_flex().w_full().h(ROW * lines.length).flex_none().items_start()
       .when(this.isSelected(it.i), (e) => e.bg(t.accent + "40")).when(Boolean(tint) && !this.isSelected(it.i), (e) => e.bg(tint))
-      .child(div().w(44).h_full().pr(8).flex_none().flex().items_center().justify_end().text_color(t.dim)
-        .when(Boolean(gutter), (e) => e.bg(gutter).text_color(t.foreground)).child(number === undefined ? "" : String(number)))
-      .child(div().w(16).flex_none().text_center().text_color(t.dim).child(kind === "+" || kind === "-" ? kind : ""))
-      .child(div().flex_1().min_w(0).truncate().child(text));
+      .child(div().w(44).h_full().pr(8).flex_none().flex().justify_end().text_color(t.dim)
+        .when(Boolean(gutter), (e) => e.bg(gutter).text_color(t.foreground)).child(div().h(ROW).flex().items_center().child(number === undefined ? "" : String(number))))
+      .child(div().w(16).h(ROW).flex_none().flex().items_center().justify_center().text_color(t.dim).child(kind === "+" || kind === "-" ? kind : ""))
+      .child(v_flex().flex_1().min_w(0).children(lines.map((l) => div().h(ROW).flex().items_center().whitespace_nowrap().overflow_hidden().child(l || " "))));
   }
 
   isSelected(i) { return Boolean(this.sel) && i >= Math.min(this.sel.a, this.sel.b) && i <= Math.max(this.sel.a, this.sel.b); }
