@@ -341,10 +341,10 @@ export class ReviewTab extends RepoView {
   // A stack PR's comments say which PR and worktree: file paths are the same in every worktree.
   where() { const t = target(), p = t.pick && prFor(t); return p ? `PR #${p.number} (${p.branch}, worktree ${this.root})` : null; }
 
-  // [ / ]: the previous / next PR, through all the terminal's stacks, that has a local worktree; before the first, its
+  // [ / ]: the previous / next open PR, through all the terminal's stacks, that has a local worktree; before the first, its
   // own worktree.
   stepPR(d, cx) {
-    const prs = stacksFor(tied()).flatMap((s) => s.prs).filter((p, i, a) => p.dir && a.findIndex((q) => q.url === p.url) === i);
+    const prs = stacksFor(tied()).flatMap((s) => s.prs).filter((p, i, a) => p.state === "OPEN" && p.dir && a.findIndex((q) => q.url === p.url) === i);
     if (!prs.length) { this.say("note", "No stack with local worktrees: see the Stack pane (⌘⇧K)"); cx.notify(); return; }
     const i = prs.findIndex((p) => p.url === target().pick?.url), j = Math.max(-1, Math.min(prs.length - 1, i + d));
     if (j !== i) setPick(tied(), prs[j] ?? null);

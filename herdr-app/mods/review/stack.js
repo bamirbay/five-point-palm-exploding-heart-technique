@@ -7,7 +7,7 @@ import { exec, panes, spaces, theme } from "herdr";
 import { target, stacksFor, allStacks, link, openTab, picksOf, commentsOf, stackUrl } from "./state.js";
 import { C } from "./git.js";
 
-const FAILED = new Set(["FAILURE", "ERROR"]);
+const FAILED = new Set(["FAILURE", "ERROR"]), MERGED = "#a371f7";
 // "[Area] [5/8] feat(api): add y" -> "add y".
 const short = (title) => title.replace(/^(\[[^\]]*\]\s*)+/, "").replace(/^\w+(\([^)]*\))?!?:\s*/, "");
 // A stack's name: the [tag] or commit scope most of its titles share ("Entity Parsing", "coding-agent-insights"), else
@@ -36,29 +36,30 @@ export class StackPane {
   render(cx) {
     const t = theme(), terminal = target().terminal, stacks = stacksFor(terminal), picked = picksOf()[terminal]?.url;
     const pane = panes().find((p) => p.terminal === terminal), tab = spaces().flatMap((s) => s.tabs).find((x) => x.id === pane?.tab);
-    const chip = (id, label, action) => div().id(id).flex_none().px(6).py(1).rounded(4).border_1().border_color(t.border).text_size(11).text_color(t.dim)
+    const chip = (id, label, action) => div().id(id).flex_none().px(6).py(1).rounded(4).border_1().border_color(t.border).text_size(12).text_color(t.dim)
       .cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground)).on_click((_e, cx) => { cx.stop_propagation(); action(cx); }).child(label);
     const dim = (text) => div().px(8).py(6).text_size(12).text_color(t.dim).child(text);
 
-    // Title and the PR number (opens it on GitHub); under it, its status: CI, review, open threads, unsent comments.
+    // Line 1: position, title, the PR's number (opens it on GitHub). Line 2: the review state (or Draft, Merged, Closed)
+    // in a fixed-width slot, then "<icon> CI", so CI lines up on every row; your unsent comments on the right. One text
+    // size. Only open PRs with a local worktree open a review.
     const row = (si) => (p, i) => {
-      const drafts = p.dir ? commentsOf(`comments:${JSON.stringify([null, p.dir])}`).length : 0, n = (k, w) => `${k} ${w}${k === 1 ? "" : "s"}`;
-      const status = [
-        p.draft && ["draft", t.dim],
-        p.ci && (p.ci === "SUCCESS" ? ["✓ CI", C.green] : FAILED.has(p.ci) ? ["✗ CI", C.red] : ["• CI running", C.amber]),
-        p.review === "APPROVED" ? ["approved", C.green] : p.review === "CHANGES_REQUESTED" ? ["changes requested", C.red] : null,
-        p.unresolved > 0 && [n(p.unresolved, "thread"), C.amber],
-        drafts > 0 && [n(drafts, "unsent comment"), C.hunkText],
-      ].filter(Boolean);
-      return v_flex().id(`st-${si}-${p.url}`).flex_none().px(8).py(6).gap(2).rounded(7)
+      const open = p.state === "OPEN", drafts = p.dir ? commentsOf(`comments:${JSON.stringify([null, p.dir])}`).length : 0;
+      const ci = open && p.ci ? (p.ci === "SUCCESS" ? ["✓", C.green] : FAILED.has(p.ci) ? ["✗", C.red] : ["●", C.amber]) : null;
+      const [word, color] = p.state === "MERGED" ? ["Merged", MERGED] : p.state === "CLOSED" ? ["Closed", t.dim] : p.draft ? ["Draft", t.dim]
+        : p.review === "APPROVED" ? ["Approved", C.green] : p.review === "CHANGES_REQUESTED" ? ["Changes requested", C.red] : ["No review yet", t.dim];
+      return v_flex().id(`st-${si}-${p.url}`).flex_none().px(8).py(6).gap(3).rounded(7).text_size(12)
         .when(picked === p.url, (e) => e.bg(t.selected))
-        .when(Boolean(p.dir), (e) => e.cursor_pointer().hover((s) => s.bg(t.hover)).on_click(() => openTab(null, p)))
-        .when(!p.dir, (e) => e.opacity(0.5).tooltip("No local worktree for this branch"))
+        .when(open && Boolean(p.dir), (e) => e.cursor_pointer().hover((s) => s.bg(t.hover)).on_click(() => openTab(null, p)))
+        .when(open && !p.dir, (e) => e.opacity(0.5).tooltip("No local worktree for this branch"))
         .child(h_flex().gap(8).items_center()
-          .child(div().w(18).flex_none().text_size(11).text_color(t.dim).child(`${i + 1}`))
-          .child(div().flex_1().min_w(0).truncate().child(short(p.title)))
+          .child(div().w(18).flex_none().text_color(t.dim).child(`${i + 1}`))
+          .child(div().flex_1().min_w(0).truncate().text_color(open ? t.foreground : t.dim).child(short(p.title)))
           .child(chip(`gh-${si}-${p.url}`, `#${p.number}`, () => { exec("open", [p.url]).catch(() => null); }).tooltip("Open on GitHub")))
-        .when(status.length > 0, (e) => e.child(h_flex().pl(26).gap(8).text_size(11).children(status.map(([text, color]) => div().text_color(color).child(text)))));
+        .child(h_flex().pl(26).gap(8).items_center()
+          .child(div().w(116).flex_none().truncate().text_color(color).child(word))
+          .child(h_flex().flex_1().min_w(0).gap(4).items_center().when(Boolean(ci), (e) => e.child(div().text_color(ci[1]).child(ci[0])).child(div().text_color(t.dim).child("CI"))))
+          .when(drafts > 0, (e) => e.child(div().flex_none().text_color(C.hunkText).child(`${drafts} unsent comment${drafts === 1 ? "" : "s"}`))));
     };
     // A stack's line: repo, name, then what goes on the right. Section headings and Link rows share it.
     const stackLine = (id, prs, ...right) => h_flex().id(id).flex_none().h(28).px(8).gap(8).items_center()

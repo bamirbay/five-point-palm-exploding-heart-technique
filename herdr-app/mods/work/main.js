@@ -33,7 +33,8 @@ const PR_QUERY = `query($open: String!, $merged: String!) {
 }
 fragment pr on PullRequest {
   number title url isDraft state headRefName headRefOid baseRefName mergedAt updatedAt
-  repository { name nameWithOwner } stack { number } stackEntry { position }
+  repository { name nameWithOwner } stackEntry { position }
+  stack { number entries(first: 50) { nodes { position pullRequest { number title url state isDraft } } } }
   reviewDecision
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
   reviewThreads(first: 100) { nodes { id isResolved } }
@@ -63,7 +64,12 @@ async function fetchPRs() {
   const repos = [...new Set(all.map((p) => p.repo))];
   const trees = Object.fromEntries(await Promise.all(repos.map(async (r) => [r, await worktrees(`${REPOS()}/${r}`).catch(() => ({}))])));
   for (const p of all) p.dir = trees[p.repo][p.branch] ?? null;
-  return { at: Date.now(), open, merged, warning: j.errors?.[0]?.message ?? null };
+  // Every GitHub stack an open or merged PR is in, with all its PRs (merged and closed ones too): "<owner/repo>#<n>" -> entries.
+  const stacks = {};
+  for (const n of [...(d.open?.nodes ?? []), ...(d.merged?.nodes ?? [])]) {
+    if (n?.stack) stacks[`${n.repository.nameWithOwner}#${n.stack.number}`] ??= n.stack.entries.nodes.map((e) => ({ position: e.position, ...e.pullRequest }));
+  }
+  return { at: Date.now(), open, merged, stacks, warning: j.errors?.[0]?.message ?? null };
 }
 
 // What every view shows for a PR: "#12 ✓ approved". tone "bad" (CI failed, changes requested) is red, "good" (approved) green.
