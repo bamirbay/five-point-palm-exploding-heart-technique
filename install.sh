@@ -15,5 +15,6 @@ link herdr-app/keys.json "$H/keys.json"
 for f in "$R"/herdr-app/layouts/*.json; do link "herdr-app/layouts/${f##*/}" "$H/layouts/${f##*/}"; done
 for d in "$R"/herdr-app/mods/*/; do d=${d%/}; link "herdr-app/mods/${d##*/}" "$H/mods/${d##*/}"; done
 for f in "$R"/herdr-core/templates/*.md; do link "herdr-core/templates/${f##*/}" ~/.config/herdr-core/templates/"${f##*/}"; done
-link claude/CLAUDE.md ~/.claude/CLAUDE.md
+link AGENTS.md ~/.claude/CLAUDE.md
+link AGENTS.md ~/.codex/AGENTS.md
 for d in "$R"/skills/*/; do d=${d%/}; link "skills/${d##*/}" ~/.claude/skills/"${d##*/}"; done

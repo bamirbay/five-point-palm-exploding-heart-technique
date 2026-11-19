@@ -21,7 +21,7 @@ The Herdr window:
 | `herdr-app/mods/my-pane` | Each pane's header. After the name it shows the branch's Linear issue and PR. Its close button follows the `cmd-w` rules |
 | `herdr-app/keys.json` | Key bindings (see below) |
 | `herdr-app/CLAUDE.md` | Notes for agents that edit the mods (run `./install.sh` after an edit) |
-| `claude/CLAUDE.md` | Global Claude instructions, with the Herdr rules (sub-agents, reviewers). `~/.claude/CLAUDE.md` links here |
+| `AGENTS.md` | Global agent instructions, with the Herdr rules (sub-agents, reviewers). `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` link here |
 | `skills/` | Claude skills, each linked from `~/.claude/skills/`. grill-me (from mattpocock/skills), find-skills (vercel-labs/skills) and thermo-nuclear-code-quality-review (cursor/plugins) are copies of third-party skills: to update one, copy it again from its source |
 | `herdr-core/templates/` | The two PR reviewers, as `hc` templates. They need the `ponytail-review` skill (ponytail plugin) and `thermo-nuclear-code-quality-review` |
 | `install.sh` | Links everything into place (see Install) |
@@ -31,7 +31,7 @@ The Herdr window:
 1. Clone this repo anywhere and run `./install.sh`. It links each piece where Herdr and Claude read it:
    - `herdr-app/keys.json`, `layouts/*.json` and each mod → `~/.config/herdr-app/`
    - `herdr-core/templates/*.md` → `~/.config/herdr-core/templates/`
-   - `claude/CLAUDE.md` → `~/.claude/CLAUDE.md`, and each skill → `~/.claude/skills/`
+   - `AGENTS.md` → `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, and each skill → `~/.claude/skills/`
 
    It never replaces a real file: move yours away first (merge your own `keys.json` and `CLAUDE.md` into the repo's).
    Then run `herdr-app do layout.switch --name my-main`.
