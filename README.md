@@ -59,7 +59,8 @@ Or tell your Claude: "add the Herdr setup from this repo".
 | `cmd-b` / `cmd-shift-b` | Left / right sidebar |
 | `cmd-1..9`, `ctrl-1..9` | Tabs, spaces |
 | `cmd-shift-up` / `down` | Previous / next space |
-| `cmd-left` / `right` / `up` / `down` | Move to the pane in that direction |
+| `cmd-alt-left` / `right` / `up` / `down` (also `cmd-up` / `down`) | Move to the pane in that direction |
+| `cmd-left` / `right` | Start / end of the line (in the terminal) |
 | `cmd-r` / `cmd-shift-r` | Rename tab / space |
 | `cmd-t`, `cmd-shift-t` | New tab, new Claude tab |
 | `cmd-w`, `cmd-shift-w` | Close the pane. A terminal's pane asks first (Enter closes, Esc cancels). On a sub-agent, it goes back under its parent and keeps running. Never closes a space's last pane |
