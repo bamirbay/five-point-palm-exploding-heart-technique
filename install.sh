@@ -17,4 +17,5 @@ for d in "$R"/herdr-app/mods/*/; do d=${d%/}; link "herdr-app/mods/${d##*/}" "$H
 for f in "$R"/herdr-core/templates/*.md; do link "herdr-core/templates/${f##*/}" ~/.config/herdr-core/templates/"${f##*/}"; done
 link AGENTS.md ~/.claude/CLAUDE.md
 link AGENTS.md ~/.codex/AGENTS.md
+link worktrunk/config.toml ~/.config/worktrunk/config.toml
 for d in "$R"/skills/*/; do d=${d%/}; link "skills/${d##*/}" ~/.claude/skills/"${d##*/}"; done

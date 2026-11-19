@@ -1,0 +1,10 @@
+# Worktrunk user config. install.sh links it to ~/.config/worktrunk/config.toml.
+# <repo>/.worktrees/<branch without bekzat/>: Herdr finds a worktree's PR by the repo folder name in its path.
+worktree-path = "{{ repo_path }}/.worktrees/{{ branch | replace('bekzat/', '') | sanitize }}"
+
+# Blocking, so .env files exist before setup-worktree-env edits them and before any -x command starts.
+pre-start = "wt step copy-ignored && ~/Developer/tools/setup-worktree-env"
+
+[step.copy-ignored]
+# A copied venv still points at the main checkout's venv; let uv build a fresh one.
+exclude = [".venv/"]
