@@ -22,7 +22,7 @@ The Herdr window:
 | `herdr-app/keys.json` | Key bindings (see below) |
 | `herdr-app/CLAUDE.md` | Notes for agents that edit the mods (run `./install.sh` after an edit) |
 | `AGENTS.md` | Global agent instructions, with the Herdr rules (sub-agents, reviewers). `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` link here |
-| `skills/` | Claude skills, each linked from `~/.claude/skills/`. handoff writes a handoff to `~/Developer/scratch/<date>-<topic>.md` and prints the `hc run` line for the next agent. grill-me (from mattpocock/skills), find-skills (vercel-labs/skills) and thermo-nuclear-code-quality-review (cursor/plugins) are copies of third-party skills: to update one, copy it again from its source |
+| `skills/` | Claude skills, each linked from `~/.claude/skills/`. handoff writes a handoff to `~/Developer/scratch/<date>-<topic>.md` and prints the `cd <worktree> && claude "..."` line for the next agent. grill-me (from mattpocock/skills), find-skills (vercel-labs/skills) and thermo-nuclear-code-quality-review (cursor/plugins) are copies of third-party skills: to update one, copy it again from its source |
 | `worktrunk/config.toml` | Worktrunk (`wt`) settings: worktrees go to `<repo>/.worktrees/<branch without bekzat/>` (Herdr finds PRs by that path), and a hook copies ignored `.env` files and `node_modules` in (not `.venv`), then runs `~/Developer/tools/setup-worktree-env` |
 | `herdr-core/templates/` | The two PR reviewers, as `hc` templates. They need the `ponytail-review` skill (ponytail plugin) and `thermo-nuclear-code-quality-review` |
 | `install.sh` | Links everything into place (see Install) |
