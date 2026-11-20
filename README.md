@@ -1,5 +1,7 @@
 # Five Point Palm Exploding Heart Technique
 
+<img width="360" height="363" alt="paymai" src="https://github.com/user-attachments/assets/3bdc2b7d-5ccd-4457-80b1-f1e060763ca1" />
+
 My agent setup: a Herdr window for working with coding agents, plus the Claude instructions and skills it relies on.
 
 The Herdr window:
